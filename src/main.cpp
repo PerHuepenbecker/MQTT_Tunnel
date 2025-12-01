@@ -7,6 +7,8 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
+#include <MQTTClient.h>
+
 // Function to create a TUN device. 
 // dev: Name of the TUN device to create, e.g. "TUN0"
 
@@ -43,5 +45,18 @@ int tun_create(const char *dev) {
     return fd;
 }
 
+int main() {
+    const char *tun_name = "tun0";
+    int tun_fd = tun_create(tun_name);
+    if (tun_fd < 0) {
+        std::cerr << "Error creating TUN device" << std::endl;
+        return 1;
+    }
+
+    // TODO: MQTT Client handling
+    // TODO: Handling of read/write to TUN device / MQTT messages
 
 
+    close(tun_fd);
+    return 0;
+}
