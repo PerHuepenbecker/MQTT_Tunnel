@@ -179,6 +179,51 @@ Begründung:
 Insbesondere durch die starke Nutzung in Smart-Home- und IoT-Umgebungen ist MQTT praktisch relevant und sehr gut geeignet als Trägerprotokoll für das Tunneln von Nachrichten.
 
 ---
+# 3. Systemdesign des MQTT-Tunnels
+
+## 3.1 Zielsetzung
+
+## 3.2 Architekturübersicht
+
+## 3.3 Kommunikationsmodell
+
+## 3.4 Protokolldefinition und Datenformat
+
+## 3.5 Einsatz eines TUN-Devices
+
+## 3.6 Sicherheitsbetrachtung
+
+---
+
+# 4. Implementierung
+
+## 4.1 Entwicklungsumgebung
+
+## 4.2 Aufbau der Software
+
+## 4.3 TUN-Device-Anbindung
+
+## 4.4 MQTT-Integration
+
+## 4.5 Programmablauf
+
+---
+
+# 5. Tests und Analyse
+
+## 5.1 Funktionale Tests
+
+## 5.2 Performance und Latenz
+
+## 5.3 Wireshark-Analyse
+
+## 5.4 Fehlerfälle
+
+---
+
+# 6. Fazit
+
+---
 
 # Quellenverzeichnis
 
