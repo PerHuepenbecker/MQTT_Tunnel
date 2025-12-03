@@ -189,6 +189,21 @@ Der stetig steigende Trend beim Einsatz sogenannter Smarthome-Komponenten in Ver
 
 ## 3.3 Kommunikationsmodell
 
+Für die bidirektionale Kommunikation zwischen Tunnel-Client und Tunnel-Server werden bewusst **zwei getrennte MQTT-Topics** verwendet:
+
+- `tunnel/client_to_server`
+- `tunnel/server_to_client`
+
+Diese Entscheidung wurde aus folgenden Gründen getroffen:
+
+- sie verhindert zuverlässig, dass ein Client seine eigenen Nachrichten wieder empfängt  
+- viele verbreitete MQTT-Broker unterstützen das MQTT-5-Flag `no_local` nicht oder verarbeiten es inkonsistent  
+- dadurch ist die Lösung auch mit **MQTT 3.1.1** vollständig kompatibel  
+- das Verhalten bleibt deterministisch und unabhängig vom Broker  
+- die Implementierung wird robuster gegenüber unterschiedlichen Broker-Implementierungen (Mosquitto, EMQX, HiveMQ, VerneMQ usw.)
+
+Durch diese klare Trennung der Datenrichtungen wird ein stabiler und vorhersagbarer Tunnelbetrieb gewährleistet.
+
 ## 3.4 Protokolldefinition und Datenformat
 
 ## 3.5 Einsatz eines TUN-Devices
