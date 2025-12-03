@@ -29,154 +29,156 @@ Robin Wetzlar
 
 # Aufgabenstellung
 
-Es gibt verschiedene Wege und Protokolle, über die sich ein Tunnel realisieren lässt. Empfehlenswert ist ein Protokoll, das mit hoher Wahrscheinlichkeit trotz Firewalls oder Proxies in einem Netzwerk verfügbar ist. Dadurch reduziert sich die Auswahl möglicher Kandidaten.
+Es gibt verschiedene Wege und Protokolle, über die sich ein Tunnel realisieren lässt. Allerdings ist es empfehlenswert, einen Tunnel über ein Protokoll zu wählen, das mit einer hohen Wahrscheinlichkeit in einem Netzwerk trotz Firewalling und vielleicht sogar irgendwelcher Proxies verfügbar ist. Das schränkt die Auswahl schon etwas ein.
 
-Typische und häufig genutzte Protokolle wären:
+Vielversprechend und entsprechend häufig genutzt sind:
 
 - HTTP / HTTPS  
 - DNS  
 
-Diese sollen im Rahmen dieses Praktikums **nicht genutzt** werden. Stattdessen soll ein „Exot“ ausgewählt werden: ein Protokoll, das **einen Message-Broker verwendet**, wie:
+Die wollen wir in diesem Praktikum daher nicht nutzen, das wäre ja langweilig – stattdessen wollen wir einen „Exoten“ nutzen: Ein Protokoll, das einen Message-Broker nutzt, wie:
 
-- **MQTT**,  
-- **CORBA**,  
-- oder ein anderes brokerbasiertes Protokoll.
+- MQTT  
+- CORBA  
 
-Die Aufgabenstellung fordert:
+In Ihrer Gruppe wählen Sie eines dieser Protokolle oder ein weiteres broker-basiertes Protokoll aus, dokumentieren das „Warum“ (es gibt kein „richtig“ und „falsch“, aber Ihre Beweggründe sind interessant) und entwickeln, möglichst unter Zuhilfenahme vorhandener Tools / Frameworks / bekannter Lösungen eine Implementierung, um einen Tunnel zu ermöglichen.
 
-1. Auswahl eines geeigneten Trägerprotokolls und Begründung dieser Entscheidung.  
-2. Entscheidung, ob allgemeine TCP/UDP/IP-Verbindungen oder nur HTTP(S) getunnelt werden sollen.  
-3. Implementierung eines funktionierenden Tunnels.  
-4. Dokumentation aller Design- und Implementationsentscheidungen.  
-5. Test des Tunnels mittels z. B. Wireshark oder tcpdump.  
-6. Dokumentation der Gruppenbeiträge.
+Im Idealfall können Sie dann durch diesen Tunnel z. B. mit SSH, OpenVPN oder Wireguard alles weitere durchtunneln, alternativ beschränken Sie sich darauf, dass Ihr Tunnel HTTP(S)-Anfragen durchleitet. Was Sie anbieten, ist eine Design-Entscheidung. Auch dafür sollten Sie die Argumente wieder dokumentieren. Auch hier geht es um die Überlegungen, nicht um ein „richtig“ oder „falsch“.
+
+Ihre Aufgaben für die Gruppenarbeit sind also:
+
+1. Erörtern Sie, welches Protokoll Ihr Trägerprotokoll wird.  
+2. Erörtern Sie, ob Sie allgemein alle TCP- oder UDP- oder IP-Verbindungen tunneln wollen oder nur HTTP(S).  
+3. Implementieren Sie Ihren Tunnel. Dokumentieren Sie Implementationsentscheidungen.  
+
+Hinweis: Dazu sollten Sie auch die Anforderungen und Lösungsideen gründlich analysieren, der Anspruch ist, dass die Beschreibung zwar abstrakt, aber konkret genug ist, dass auf Ihr Darstellung aufbauend jemand die Implementierung erfolgreich starten kann. Der Teufel liegt bekanntlich im Detail, das vielleicht auch erst bei Tests und der Umsetzung auffällt, das müssen Sie nicht entdecken. Die Ergebnisse sollten sich in Ihrem Paper wiederfinden.
+
+4. Testen Sie Ihren Tunnel gründlich. Dazu gehört auch, den Tunnel mal mit tcpdump, Wireshark o. ä. aufzuzeichnen und zu prüfen, was ein Dritter sieht.  
+5. Dokumentieren Sie in Ihrer Abgabe, welche Gruppenmitglieder an welchem Teil der Aufgabe mitgewirkt haben, wer für welchen Teil „den Hut auf hatte“ und welchen Anteil welches Gruppenmitglied an dem Teil hatte. Im Idealfall sollten im Ergebnis alle Gruppenmitglieder etwa gleich viel geleistet haben.
+
+Die Aufgaben bearbeiten Sie in Gruppen von bis zu vier Personen. (Jedes Schild hat eine Geschichte, so auch der Hinweis, dass eine Personengruppe mindestens zwei Personen umfasst.)
+
+Das Paper (also der gedanklich-wissenschaftliche Hintergrund) geben Sie als .pdf-Datei über Moodle ab, die Implementierung im (ggf. compilierbaren) Quellcode als .tar.gz.
+
+Sie sind frei in der Wahl der Programmiersprache(n), Sie dürfen auch auf z. B. den Code von iodine oder anderen Frameworks aufsetzen, wenn das für Sie sinnvoll erscheint. Das sind Design-Entscheidungen, die Sie in Ihrem Paper diskutieren und erläutern sollten.
 
 ---
 
 # Protokolle im Überblick
 
-Im Folgenden werden die beiden vorgeschlagenen Broker-basierten Protokolle **CORBA** und **MQTT** vorgestellt. Anschließend wird begründet, warum eines davon für die weitere praktische Umsetzung ausgewählt wurde.
+Um eine Entscheidungsgrundlage zu gewährleisten, werden im ersten Schritt die beiden vorgeschlagenen Protokolle mit Messagebrokercharakter in Kürze dargestellt. Dabei werden die wesentlichen Funktionsweisen, typische Anwendungsbereiche und markante Merkmale der jeweiligen Protokolle dargestellt.
+
+Im weiteren Verlauf wird die letztendlich getroffene Entscheidung, welches der beiden eingangs genannten Protokolle für die weitere Bearbeitung der Aufgabenstellung Relevanz findet. Diese Entscheidung wird anhand der aufgezeigten Charakteristika begründet.
 
 ---
 
-# 1. CORBA
+# Corba
 
-## 1.1 Überblick
+CORBA (Common Object Request Broker Architecture) ist kein einzelnes Protokoll im herkömmlichen Sinne, sondern kann als Standard für eine Middlewarearchitektur, welche eine Kommunikation zwischen verteilten Softwarekomponenten ermöglicht, verstanden werden. Diese ist dabei unabhängig von der jeweilig gewählten Programmiersprache, Betriebssystem oder Hardwareplattform. Das spezifische Netzwerkprotokoll, das CORBA für die Interoperabilität verwendet, heißt Internet Inter-ORB Protocol (IIOP) und basiert dabei auf TCP/IP. Es ist eine objektorientierte Middleware für verteilte heterogene Systeme, die von der Object Management Group entworfen und spezifiziert wurde [1,2,3].
 
-CORBA (Common Object Request Broker Architecture) ist ein Standard für verteilte, objektorientierte Middleware. Er ermöglicht Kommunikation zwischen Softwarekomponenten unabhängig von Programmiersprache, Plattform und Betriebssystem [1][2][3].  
+## Funktionsweise
 
-Für die Netzwerkkommunikation verwendet CORBA das **Internet Inter-ORB Protocol (IIOP)** auf Basis von TCP/IP.
+Das Kernstück der CORBA-Architektur ist der Object Request Broker (ORB). Der ORB ist verantwortlich für die Vermittlung aller Anfragen und Antworten zwischen Clients (Nutzern eines Dienstes) und Servern (Anbietern eines Dienstes).
 
-## 1.2 Funktionsweise
+Der Prozess der Kommunikation funktioniert in mehreren Schritten:
 
-Das zentrale Element der CORBA-Architektur ist der **Object Request Broker (ORB)**. Dieser vermittelt sämtliche Anfragen und Antworten zwischen Clients und Servern.
+1. **Schnittstellendefinition (IDL):**  
+   Die Schnittstelle des Server-Objekts wird mithilfe der Interface Definition Language (IDL) getreu den Spezifikationen der Object Management Group festgelegt. Diese sind sprachneutral beschrieben und zeigen genau auf, welche Operationen das Objekt bereitstellt und welche Parameter benötigt werden.
 
-Ablauf der Kommunikation:
+2. **Generierung von Stubs und Skeletons:**  
+   Aus der IDL-Definition werden sprachspezifische Codefragmente generiert:
+   - **Stubs auf der Client-Seite:** Sie verbergen die Netzwerkkommunikation vor dem Client, sodass sich der Aufruf einer entfernten Methode wie der Aufruf einer lokalen Methode anfühlt.  
+   - **Skeletons auf der Server-Seite:** Sie nehmen die Anfragen entgegen, entpacken die Daten und rufen die tatsächliche Implementierung der Server-Logik auf.
 
-1. **Schnittstellendefinition (IDL)**: Mittels Interface Definition Language, sprachneutral beschrieben.  
-2. **Generierung von Stubs und Skeletons**:  
-   - *Stubs* auf Client-Seite kapseln Netzwerkdetails.  
-   - *Skeletons* auf Server-Seite decodieren die Anfragen.  
-3. **Objektreferenz und Naming Service**: Der Server registriert seine Objekte, Clients erhalten Referenzen.  
-4. **ORB als Vermittler**: Weiterleitung der Methodenaufrufe anhand der Referenzen.  
-5. **Datenübertragung über IIOP** (Marshalling + TCP/IP).  
-6. **Antwort an den Client** über denselben Weg.
+3. **Objektreferenz und Naming Service:**  
+   Der Server erstellt das Objekt und registriert es bei einem Naming Service. Der Client kann dann über diesen Dienst eine eindeutige Objektreferenz (ähnlich einer Adresse) für das benötigte Objekt erhalten.
 
-CORBA ermöglicht damit **Transparenz der Lokalität** — aus Sicht des Clients wirken entfernte Objekte wie lokale [1][2][3].
+4. **Der ORB als Vermittler:**  
+   Wenn der Client eine Methode aufruft (über den Stub), fängt der lokale ORB diese Anfrage ab. Er verwendet die Objektreferenz, um das entfernte Server-Objekt im Netzwerk zu lokalisieren.
 
-## 1.3 Typische Einsatzgebiete
+5. **Datenübertragung mit IIOP:**  
+   Die Anfrage (einschließlich Methodennamen und Parameter) wird vom Client-ORB serialisiert (gemarshallt) und über das Netzwerk mithilfe des IIOP an den Server-ORB gesendet. IIOP verwendet hierfür TCP/IP.
 
-CORBA wird heute vor allem eingesetzt in:
+6. **Ausführung und Antwort:**  
+   Der Server-ORB empfängt die Daten, leitet sie an das Skeleton weiter, das die tatsächliche Methode auf dem Server-Objekt ausführt. Die Antwort wird dann auf dem gleichen Weg zurück an den Client gesendet.
 
-- Integration von **Legacy-Systemen** [5][6]  
-- **Echtzeit- und eingebetteten Systemen** (z. B. Luft- und Raumfahrt) [5]  
-- **Großen Unternehmensinfrastrukturen** (Finanz-/Versicherungssektor) [7]  
-- Industrieller **Automatisierung** und Steuerungssystemen [8]
+Zusammenfassend ermöglicht CORBA die Transparenz der Lokalität, sodass Entwickler verteilte Anwendungen schreiben können und dabei die Annahme treffen können, dass sich alle Objekte verhalten, als ob sie sich im selben Speicherraum befinden. [1,2,3]
 
-Es wird primär dort genutzt, wo Migration zu modernen Alternativen aufwändig oder riskant wäre [5][6][7][8].
+## Typische Einsatzgebiete
 
-## 1.4 Typische Paketgrößen
+Das CORBA-Protokoll wird heutzutage vor allem in spezifischen Bereichen und für die Integration von älteren Systemen (Altsystemen) genutzt. Obwohl es in neuen Softwareentwicklungen oft durch modernere Alternativen wie Webservices oder Microservices ersetzt wird, findet es in folgenden Bereichen weiterhin Anwendung:
 
-Die Nachrichtengröße hängt stark vom Anwendungskontext ab und ist nicht standardisiert:
+- **Altsysteme (Legacy-Systeme):** Integration bestehender, älterer Software.
+- **Echtzeit- und eingebettete Systeme:** z. B. Luft- und Raumfahrt.
+- **Große Unternehmensinfrastrukturen:** z. B. Finanz- und Versicherungssektor.
+- **Industrielle Automatisierung:** Verbindung heterogener Maschinen und Systeme.
 
-- **Anwendungsdaten** bestimmen primär die Größe  
-- **MTU** limitiert Paketgröße (typ. 1500 Byte)  
-- ORBs nutzen interne **Fragmentierung** (oft bei 1024 Byte pro Fragment) [10]  
-- **Header-Overhead**:  
-  - GIOP/IIOP: 12 Byte  
-  - TCP: ~20–32 Byte  
-  - IP: ~20 Byte
+Da die Echtzeitfähigkeit für die Aufgabenstellung keine Relevanz darstellt, wird an dieser Stelle nicht weiter auf RT-CORBA eingegangen.
 
-Nachrichten können wenige Bytes bis mehrere Megabyte umfassen [1][2][10].
+## Typische Paketgröße
+
+Es gibt keine feste „typische“ Größe für CORBA-Datenpakete. Die Paketgröße hängt vor allem ab von:
+
+- Art und Größe der übergebenen Datenstrukturen  
+- Fragmentierung durch Netzwerk-MTU (typisch 1500 Bytes)  
+- ORB-spezifischer Fragmentierungslogik  
+- Header-Overhead (IIOP-Header + TCP/IP)  
+
+Kleine Pakete können nur wenige Dutzend Bytes groß sein, während große Datenübertragungen mehrere Megabyte umfassen können. [1,2,10]
 
 ---
 
-# 2. MQTT
+# MQTT
 
-## 2.1 Überblick
+MQTT (Message Queuing Telemetry Transport) ist ein schlankes, offenes Nachrichtenprotokoll, das speziell für die Machine-to-Machine (M2M)-Kommunikation im Internet of Things (IoT) entwickelt wurde. Es ist darauf ausgelegt, Daten effizient in Umgebungen mit begrenzter Bandbreite, hoher Latenz oder unzuverlässigen Netzwerkverbindungen zu übertragen. [11,12]
 
-MQTT (Message Queuing Telemetry Transport) ist ein leichtgewichtiges Publish/Subscribe-Protokoll für Machine-to-Machine- und IoT-Kommunikation. Es ist optimiert für geringe Bandbreite, hohe Latenz und unzuverlässige Netzwerke [11][12].
+## Funktionsweise
 
-## 2.2 Funktionsweise
+MQTT basiert auf dem **Publish/Subscribe-Modell**. Die Architektur umfasst:
 
-MQTT basiert auf einer **Broker-Architektur** mit folgenden Rollen:
+- **Publisher** – sendet Nachrichten zu einem Topic  
+- **Subscriber** – empfängt Nachrichten zu abonnierten Topics  
+- **Broker** – zentrale Vermittlungsinstanz  
 
-- **Publisher**: sendet Nachrichten zu einem Topic  
-- **Subscriber**: empfängt Nachrichten durch Abonnement  
-- **Broker**: vermittelt und verteilt Nachrichten  
+Sender und Empfänger sind vollständig entkoppelt. [11,13]
 
-Sender und Empfänger sind zeitlich und räumlich vollständig entkoppelt [11][13].
+## Typische Einsatzgebiete
 
-## 2.3 Typische Einsatzgebiete
+MQTT ist einer der wichtigsten Standards in:
 
-MQTT findet Anwendung in:
+- IoT  
+- Smart Home  
+- industrieller Automatisierung  
+- Telemetrie und Sensornetzwerken  
+- Logistik  
+- Wearables  
+- Cloud-Plattformen  
 
-- IoT allgemein  
-- **Smart Home** und Gebäudeautomation (z. B. Home Assistant, OpenHAB)  
-- **Industrieller Automation (IIoT)**  
-- Telemetrie über unzuverlässige/teure Leitungen (z. B. Satellit)  
-- Logistik & Asset Tracking  
-- Wearables & Gesundheitswesen  
-- Cloud-Plattformen (AWS IoT, Azure, Google Cloud) [11][14][15][16][17]
+Gründe für seine Beliebtheit:
 
-Gründe für die hohe Verbreitung:
+- geringer Overhead  
+- effiziente Architektur  
+- Zuverlässigkeit durch QoS-Stufen
 
-- sehr geringer Overhead  
-- effizientes Publish/Subscribe-Modell  
-- verschiedene QoS-Stufen zur Zuverlässigkeitssicherung
+## Typische Paketgröße
 
-## 2.4 Typische Paketgrößen
+Die MQTT-Paketgröße wird bestimmt durch:
 
-Ein MQTT-Paket besteht aus:
+- Fixed Header (immer 2 Bytes)  
+- Variable Header (topicabhängig)  
+- Payload (0 Bytes bis mehrere MB)  
 
-- **Fixed Header** (mind. 2 Byte)  
-- **Variable Header**  
-- **Payload** (Sensorwerte, JSON-Daten etc.)
-
-Typische Größen:
-
-- Sensorwerte: wenige Dutzend Bytes  
-- JSON-Daten: wenige KB  
-- Maximalgröße (MQTT 3.1.1): 256 MB [11]
-
-Große Daten werden aufgrund der **MTU** fragmentiert (typ. 1500 Byte).
+Typischerweise sind MQTT-Pakete sehr klein (Dutzende Bytes). Maximale Größe: 256 MB. Fragmentierung erfolgt über IP-MTU. [11]
 
 ---
 
 # Entscheidung
 
-Die Gruppe hat sich auf Basis der analysierten Protokolleigenschaften für **MQTT** entschieden.
+Auf Grund der dargestellten Informationslage wurde sich innerhalb der Gruppenarbeit auf die Nutzung des MQTT-Protokolls geeinigt.
 
-Begründung:
+Die Begründung liegt dabei hauptsächlich in dem breiteren Anwendungsspektrum gepaart mit dem gleichzeitig effizient gestalteten Nachrichtenaufbau. Zeitgleich dient die prominente Verbreitung des MQTT-Protokolls innerhalb der IoT-Thematik vermehrte Berührungspunkte im alltäglichen Leben.  
 
-- modernes, leichtgewichtiges Protokoll  
-- hohe Effizienz durch geringen Overhead  
-- hervorragende Eignung für verteilte Systeme  
-- breite Verbreitung in IoT, Smart Home, Industrie  
-- robuste Broker-Infrastruktur und gute Client-Bibliotheken  
-- einfache Integration in eigene Softwareprojekte
-
-Insbesondere durch die starke Nutzung in Smart-Home- und IoT-Umgebungen ist MQTT praktisch relevant und sehr gut geeignet als Trägerprotokoll für das Tunneln von Nachrichten.
+Der stetig steigende Trend beim Einsatz sogenannter Smarthome-Komponenten in Verbindung mit den verschiedensten Steuerungszentralen, welche zum Beispiel auf OpenSource-Plattformen wie Home-Assistant oder IO-Broker basieren, birgt weiteres Potential zur gesteigerten Verbreitung des MQTT-Protokolls und damit größeren Einfluss im privaten Bereich.
 
 ---
 # 3. Systemdesign des MQTT-Tunnels
