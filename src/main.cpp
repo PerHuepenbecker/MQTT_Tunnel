@@ -110,9 +110,9 @@ int main(int argc, char** argv) {
 
     // Can be cleaned up to use netlink
  
-    system("ip addr add 10.8.0.1/24 dev tun0");
+    system("ip addr add 10.0.0.1/24 dev tun0");
     system("ip link set tun0 up");
-    system("ip route add 10.8.0.2 dev tun0");
+    system("ip route add 10.0.0.2 dev tun0");
 
     // MQTT Client setup
 
