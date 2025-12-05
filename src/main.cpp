@@ -10,7 +10,6 @@
 #include <MQTTClient.h>
 
 // Function to create a TUN device. 
-// dev: Name of the TUN device to create, e.g. "TUN0"
 
 int tun_create(const char *dev) {
     struct ifreq ifr;
@@ -23,10 +22,7 @@ int tun_create(const char *dev) {
         return fd;
     }
 
-
     // clear the struct and set the flags
-    // IFF_TUN   - TUN device, so strictly IP traffic
-    // IFF_NO_PI -  Do not provide packet information
 
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
@@ -49,8 +45,6 @@ int tun_fd_static = -1;
 
 
 int mqtt_incoming_message_callback(void* context, char* topic_name, int topic_len, MQTTClient_message* message) {
-    // Placeholder for handling incoming MQTT messages
-    // You would typically read the payload and write it to the TUN device
     
     if (tun_fd_static < 0) {
         std::cerr << "TUN device not initialized" << std::endl;
@@ -114,6 +108,13 @@ int main(int argc, char** argv) {
     }
     tun_fd_static = tun_fd;
 
+    // Can be cleaned up to use netlink
+ 
+    system("ip addr add 10.8.0.1/24 dev tun0");
+    system("ip link set tun0 up");
+    system("ip route add 10.8.0.2 dev tun0");
+
+    // MQTT Client setup
 
     MQTTClient client;
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
@@ -139,7 +140,7 @@ int main(int argc, char** argv) {
             std::cerr << "Error reading from TUN device: " << strerror(errno) << std::endl;
             break;
         }
-        
+
         MQTTClient_message pubmsg = MQTTClient_message_initializer;
         pubmsg.payload = buffer;
         pubmsg.payloadlen = read_bytes;
@@ -153,9 +154,6 @@ int main(int argc, char** argv) {
             std::cerr << "Failed to publish message, return code " << return_code << std::endl;
         }
     }
-
-    // TODO: MQTT Client handling
-    // TODO: Handling of read/write to TUN device / MQTT messages
 
 
     close(tun_fd);
