@@ -154,7 +154,9 @@ int main(int argc, char** argv) {
         int return_code = MQTTClient_publishMessage(client, outbound_topic, &pubmsg, &token);
         
         if (return_code != MQTTCLIENT_SUCCESS) {
-            std::cerr << "Failed to publish message, return code " << return_code << std::endl;
+            std::cerr << "Failed to publish message, return code is " << return_code << std::endl;
+        } else {
+            std::cout << "Written " << read_bytes << " bytes" << std::endl;
         }
     }
 
