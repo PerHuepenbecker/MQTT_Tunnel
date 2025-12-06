@@ -48,7 +48,7 @@ int mqtt_incoming_message_callback(void* context, char* topic_name, int topic_le
     
     if (tun_fd_static < 0) {
         std::cerr << "TUN device not initialized" << std::endl;
-        return;
+        return 0;
     }
 
     unsigned char* data = static_cast<unsigned char*>(message->payload);
@@ -124,12 +124,20 @@ int main(int argc, char** argv) {
 
     MQTTClient_setCallbacks(client, NULL, NULL, mqtt_incoming_message_callback, NULL);
 
-    if(MQTTClient_connect(client, &conn_opts) != MQTTCLIENT_SUCCESS) {
-        std::cerr << "Failed to connect to MQTT broker" << std::endl;
+    int rc = MQTTClient_connect(client, &conn_opts);
+    if(rc != MQTTCLIENT_SUCCESS) {
+        std::cerr << "Failed to connect to MQTT broker, return code: " << rc << std::endl;
+        std::cerr << "Broker address: " << broker_address << std::endl;
+        std::cerr << "Client ID: " << client_id << std::endl;
         return 1;
     }
+    
+    std::cout << "Successfully connected to MQTT broker" << std::endl;
 
     MQTTClient_subscribe(client, inbound_topic, 1);
+    std::cout << "Subscribed to topic: " << inbound_topic << std::endl;
+    std::cout << "Publishing to topic: " << outbound_topic << std::endl;
+    std::cout << "TUN device ready, waiting for data..." << std::endl;
 
     unsigned char buffer[2000];
 
