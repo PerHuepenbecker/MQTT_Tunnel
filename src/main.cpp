@@ -99,6 +99,7 @@ int main(int argc, char** argv) {
                 return 1;
         }
     }
+    
 
     const char *tun_name = "tun0";
     int tun_fd = tun_create(tun_name);
@@ -128,17 +129,11 @@ int main(int argc, char** argv) {
     if(rc != MQTTCLIENT_SUCCESS) {
         std::cerr << "Failed to connect to MQTT broker, return code: " << rc << std::endl;
         std::cerr << "Broker address: " << broker_address << std::endl;
-        std::cerr << "Client ID: " << client_id << std::endl;
         return 1;
     }
     
-    std::cout << "Successfully connected to MQTT broker" << std::endl;
-
     MQTTClient_subscribe(client, inbound_topic, 1);
-    std::cout << "Subscribed to topic: " << inbound_topic << std::endl;
-    std::cout << "Publishing to topic: " << outbound_topic << std::endl;
-    std::cout << "TUN device ready, waiting for data..." << std::endl;
-
+    
     unsigned char buffer[2000];
 
     while(1){
@@ -162,7 +157,6 @@ int main(int argc, char** argv) {
             std::cerr << "Failed to publish message, return code " << return_code << std::endl;
         }
     }
-
 
     close(tun_fd);
     return 0;
