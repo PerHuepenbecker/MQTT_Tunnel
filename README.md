@@ -1,4 +1,9 @@
 # MQTT_Tunnel
 Educational Project
 
-The objective is building a network tunneling tool leveraging MQTT.
+Work in progress. Currently prototyping the client.
+
+# Dependencies
+
+paho-MQTT C-Library
+
