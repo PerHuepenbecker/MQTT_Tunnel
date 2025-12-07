@@ -200,12 +200,42 @@ Die Begründung liegt dabei hauptsächlich in dem breiteren Anwendungsspektrum g
 
 Der stetig steigende Trend beim Einsatz sogenannter Smarthome-Komponenten in Verbindung mit den verschiedensten Steuerungszentralen, welche zum Beispiel auf OpenSource-Plattformen wie Home-Assistant oder IO-Broker basieren, birgt weiteres Potential zur gesteigerten Verbreitung des MQTT-Protokolls und damit größeren Einfluss im privaten Bereich.
 
+# Segmentierung
+Trotz der enormen Flexibilität im Bezug auf die Nachrichtengröße innerhalb der Spezifikationen des MQTT-Protokolls empfiehlt es sich beim Tunneln von großen Datenmengen diese in kleinere Pakete aufzuteilen. [18] Diese sogenannte Segmentierung bietet mehrere Vor- aber auch Nachteile.
+
+# Vorteile der Segmentierung
+Ressourcenbeschränkung
+MQTT dient oftmals als Kommunikationsprotokoll für Sensoren und Aktuatoren. Diese Geräte sind meistens mit ressourcenbeschränkten Komponenten wie Mikrocontrollern ausgestattet, die auf Grund mangelnden Zwischenspeichers mit großen Nachrichten nur bedingt umgehen können. Ein Überschreiten der hardwarebedingten Grenzen kann zu Verbindungsabbrüchen oder dem Verwerfen der Nachricht durch den Broker führen. Darüber hinaus kann eine Überlastung des Speichers dazu führen, dass die jeweiligen Komponenten zu viel Zeit für das Verarbeiten der Nachricht benötigen, wodurch das Abarbeiten der ordinär zugeordneten Hauptaufgabe beeinträchtigt oder zumindest verzögert erfolgt.
+Netzwerkstabilität
+Große, einzelne Übertragungen sind anfälliger für Netzwerkinstabilitäten. Angenommen es tritt während der Übertragung einer großen Nachricht ein Verbindungsabbruch auf. In diesem Falle müsste die gesamte Nachricht erneut versandt werden, da MQTT keinen Mechanismus zur Fortsetzung unterbrochener Datenströme bietet. Im Falle von kleineren Segmente, muss lediglich der fehlerhaft übertragene Datenframe erneut gesendet werden.
+
+# Nachteile Segmentierung
+Die Nachteile der Datensegmentierung umfassen eine Reihe von Herausforderungen, die von hohen Kosten und größerem Aufwand in der Implementierung bis hin zu mangelhafter Datenqualität reichen.
+Kosten und Ressourcenbedarf
+Der Begriff Kosten wird im weiteren mit der Belastung der Kapazität des Übertragungskanals gleichgesetzt. Erhöhte Kosten zeichnen sich für den Endanwender durch eine verminderte Übertragungsgeschwindigkeit relevanter Daten ab.
+Mit jedem Datensegment, welches versendet wird, müssen zusätzliche Informationen an das versandte Element angehängt werden. Diese bieten für den Nutzer keinen Mehrwert. Ein sogenannter Overhead entsteht, welcher für die erhöhten Kosten verantwortlich ist.
+Dieser Overhead enthält unter anderem Informationen zur originalen Nachricht, Segmentnummer oder Details zu nachfolgenden Paketen, wie z.B. letztes Segment der Ursprungsnachricht.
+Wird die originale Nachricht zu fein unterteilt, steigt die Anzahl der Segmente und damit die Menge des damit verbundenen Overheads proportional. Allgemein wird dieses Phänomen als Übersegmentierung bezeichnet.
+Ist die Segmentierung zu grob, treten möglicherweise die gewünschten Effekte nicht auf und es wird lediglich ein erhöhter Datenstrom verzeichnet.
+Planung und Umsetzung
+Wie bereits erwähnt sind sowohl die zu grobe, wie auch eine zu feine Segmentierung nicht wünschenswert. Demnach kann der hinterlegte Aufteilungsprozess sehr komplex sein und erfordert sorgfältige Planung.
+Datenqualität
+Wie bereits im Vorfeld erwähnt, bietet MQTT keinen eigenen Mechanismus zur Fortsetzung unterbrochener Datenströme. Im Falle von fehlerhaften Segmenten können demnach vereinzelte Nachrichteninhalte verloren gehen. Wird dies nicht von den entsprechenden Anwendungen erkannt oder gar korrigiert, endet die Nachrichtenübertragung in einer verminderten Datenqualität. 
+
 ---
 # 3. Systemdesign des MQTT-Tunnels
 
 ## 3.1 Zielsetzung
 
 ## 3.2 Architekturübersicht
+
+Bedingt durch die Entwicklung einer eigenen Anwendung zum Tunneln von Daten via MQTT bietet sich der Einsatz einer TUN-Device an. Ein TUN-Gerät ist eine spezifische Art von virtuellem Netzwerkgerät im Linux-Kernel, das zur Implementierung von Netzwerk-Tunneln verwendet wird, insbesondere für VPN-Dienste (Virtual Private Network).
+Es arbeitet auf der Netzwerkschicht (Schicht 3) und verarbeitet IP-Pakete. [19].
+
+Bei einem TUN-Device handelt es sich um eine virtuelle Netzwerkschnittstelle und kann vereinfacht als Punkt-zu-Punkt- oder Ethernet-Gerät betrachtet werden. Die Besonderheit liegt darin, dass anstelle einer Datenübertragung per physischen Medium, die Datenverbindung virtuell über eine eigene Anwendung aufgebaut wird. [19]
+
+Der Kernel behandelt die Datenpakete der TUN-Device genauso, als würden diese von einem echten physischen Gerät abstammen. Die TUN-Device übernimmt dabei sämtliche Netzwerkrelevanten Aufgaben wie z.B. auch die Segmentierung des ankommenden Datenstroms. Aus diesem Grund kann an dieser Stelle auf weitere Details zu diesem Thema verzichtet werden.
+
 
 ## 3.3 Kommunikationsmodell
 
@@ -281,3 +311,6 @@ Durch diese klare Trennung der Datenrichtungen wird ein stabiler und vorhersagba
 15. https://www.all-electronics.de/automatisierung/basiswissen-mqtt-was-kann-das-iot-kommunikations-protokoll  
 16. https://www.pubnub.com/blog/what-is-mqtt-use-cases  
 17. https://www.ibm.com/docs/de/ibm-mq/9.3.x?topic=overview-mq-telemetry-transport-protocol
+18. http://www.bbs-1.de/bbs1/umat/netze/netz8.html
+19. https://www.kernel.org/doc/html/latest/networking/tuntap.html
+
