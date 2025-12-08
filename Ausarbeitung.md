@@ -261,6 +261,7 @@ Durch diese klare Trennung der Datenrichtungen wird ein stabiler und vorhersagba
 ## 3.6 Sicherheitsbetrachtung
 
 Bei dem Protokoll MQTT liegt das Hauptaugenmerk auf eine ressourcenschonende Option zum Informationsaustausch zwischen einzelnen IoT-Geräten. Selbst auf der offiziellen Homepage von MQTT wird das Thema Sicherheit sehr vorsichtig formuliert.
+
 You can pass a user name and password with an MQTT packet in V3.1 of the protocol. Encryption across the network can be handled with SSL, independently of the MQTT protocol itself (it is worth noting that SSL is not the lightest of protocols, and does add significant network overhead). Additional security can be added by an application encrypting data that it sends and receives, but this is not something built-in to the protocol, in order to keep it simple and lightweight. [Originaler Auszug https://mqtt.org/faq/ unter dem Punkt "Does MQTT support security?" 08.12.2025]
 
 Es wird prinzipiell die Möglichkeit zur Einbindung einer SSL-Verschlüsslung ermöglicht, jedoch muss diese vom Nutzer erst aktiviert werden. Zeitgleich wird darauf hingewiesen, dass der Einsatz dieser Verschlüsselung entgegen des Hauptvorteils von MQTT wirkt und somit der Einsatz mit bedacht gewählt werden soll.
