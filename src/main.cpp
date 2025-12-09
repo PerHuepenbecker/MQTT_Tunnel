@@ -66,6 +66,7 @@ int mqtt_incoming_message_callback(void* context, char* topic_name, int topic_le
 }
 
 
+
 int main(int argc, char** argv) {
 
     // definition of command line argument variables
