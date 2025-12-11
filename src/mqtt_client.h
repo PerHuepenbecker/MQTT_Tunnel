@@ -2,25 +2,23 @@
 #include <vector>
 #include <memory>
 
-enum Role {
-    CONNECTOR,
-    GATEWAY
-};
+#include <MQTTClient.h> // paho mqtt client
 
-class MQTTClient {
+class MQTTClientWrapper {
 public:
-    MQTTClient(const std::string& server_uri, const std::string& client_id);
+    using MessageCallback = void(*)(const std::string& topic, const std::vector<unsigned char>& payload);
+
+    MQTTClientWrapper(const std::string& server_uri, const std::string& client_id);
 
     void connect();
     void disconnect();
     void subscribe(const std::string& topic);
     void publish(const std::string& topic, const std::vector<unsigned char>& payload);
-    
-private:
-    std::string broker_uri_;
-    std::string client_id_;
+    void set_message_callback(MessageCallback callback);
 
     
+private:
+    MQTTClient mqtt_client_; // Paho MQTT client instance
     
     // Alle relevant für separate Klasse
     
