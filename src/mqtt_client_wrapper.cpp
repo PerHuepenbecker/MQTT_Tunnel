@@ -33,17 +33,17 @@ void MQTTClientWrapper::publish(const std::string& topic, const std::vector<unsi
 }
 
 
-void MQTTClientWrapper::conopts_set_keepalive(int keepalive){
+void MQTTClientWrapper::connopts_set_keepalive(int keepalive){
     conn_opts_.keepAliveInterval = keepalive;
 }
 
-void MQTTClientWrapper::conopts_set_cleansession(bool cleansession){
+void MQTTClientWrapper::connopts_set_cleansession(bool cleansession){
     conn_opts_.cleansession = cleansession ? 1 : 0;
 }
 
 // TODO: Check handling here, since password will be kept quite long in memory
 
-void MQTTClientWrapper::conopts_set_username_password(const std::string& username, const std::string& password){
+void MQTTClientWrapper::connopts_set_username_password(const std::string& username, const std::string& password){
     conn_opts_.username = username.c_str();
     conn_opts_.password = password.c_str();
 }

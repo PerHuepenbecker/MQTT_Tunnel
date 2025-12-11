@@ -16,9 +16,9 @@ public:
     void publish(const std::string& topic, const std::vector<unsigned char>& payload);
     void set_message_callback(MessageCallback callback);
 
-    void conopts_set_keepalive(int keepalive);
-    void conopts_set_cleansession(bool cleansession);
-    void conopts_set_username_password(const std::string& username, const std::string& password); // For future use with authentcicated tunnels
+    void connopts_set_keepalive(int keepalive);
+    void connopts_set_cleansession(bool cleansession);
+    void connopts_set_username_password(const std::string& username, const std::string& password); // For future use with authentcicated tunnels
     
 
 private:
