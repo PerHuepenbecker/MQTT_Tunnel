@@ -16,11 +16,16 @@ public:
     void publish(const std::string& topic, const std::vector<unsigned char>& payload);
     void set_message_callback(MessageCallback callback);
 
+    void conopts_set_keepalive(int keepalive);
+    void conopts_set_cleansession(bool cleansession);
+    void conopts_set_username_password(const std::string& username, const std::string& password); // For future use with authentcicated tunnels
     
+
 private:
     MQTTClient mqtt_client_; // Paho MQTT client instance
+    MQTTClient_connectOptions conn_opts_;
     
-    // Alle relevant für separate Klasse
+    // Alle relevant für separate Klasse für das Management des Tunnels
     
     //std::string own_address_;
     //std::string dst_address_;

@@ -44,6 +44,7 @@ int tun_create(const char *dev) {
 int tun_fd_static = -1;
 
 
+
 int mqtt_incoming_message_callback(void* context, char* topic_name, int topic_len, MQTTClient_message* message) {
     
     if (tun_fd_static < 0) {
