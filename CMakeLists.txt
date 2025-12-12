@@ -7,25 +7,32 @@ enable_testing()
 
 
 find_package(GTest REQUIRED)
+find_package(OpenSSL REQUIRED)
 include_directories(${GTEST_INCLUDE_DIRS})
+include_directories(${OPENSSL_INCLUDE_DIR})
 
 add_executable(mqtt_tunnel src/main.cpp)
 
 target_link_libraries(mqtt_tunnel 
     paho-mqtt3c
     pthread
+    OpenSSL::SSL
+    OpenSSL::Crypto
 )
 
 add_executable(mqtt_tunnel_tests
     tests/ip_pool_test.cpp
-    src/ip_pool.cpp
-    
+    tests/helpers_test.cpp
+    src/ip_pool.cpp   
+    src/helpers.h
 )
 
 target_link_libraries(mqtt_tunnel_tests
     ${GTEST_LIBRARIES}
     ${GTEST_MAIN_LIBRARIES}
     pthread
+    OpenSSL::SSL
+    OpenSSL::Crypto
 )
 
 include(GoogleTest)
