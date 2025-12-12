@@ -1,8 +1,10 @@
 // Channel config struct for storing MQTT channel information
 #include <string>
 #include <memory>
+#include <random>
+#include <sstream>
+#include <iomanip>
 #include "mqtt_client_wrapper.h"
-
 
 struct SessionConfig {
     std::string client_id;
@@ -64,7 +66,5 @@ class TunnelManager {
         SessionConfig session_config_;
 
         SessionConfig setup_session(); // establishes session via command channel using the preshared channel name variable
-
-
 
 };
