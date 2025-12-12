@@ -1,0 +1,10 @@
+#include <gtest/gtest.h>
+#include "../src/helpers.h"
+
+TEST(HelpersTest, SHA256Hash) {
+    std::string data = "Hello, World!";
+    std::string expected_hash = "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f";
+    std::string computed_hash = get_sha256_string(data);
+    EXPECT_EQ(computed_hash, expected_hash);
+}
+
