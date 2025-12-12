@@ -14,6 +14,7 @@ struct SessionConfig {
 // Client Hello for initiating a session handshake
 
 struct ClientHello {
+    std::string message_identifier;
     std::string client_base_id;
     bool authentication;
     std::string auth_data; // optional authentication or identification data
@@ -24,6 +25,7 @@ struct ClientHello {
 // Server Hello for client configuration
 
 struct ServerHello {
+    std::string message_identifier;
     std::string handshake_identifier;
     std::string assigned_client_id_;
     std::string assigned_client_ip;
@@ -32,6 +34,23 @@ struct ServerHello {
     std::string data_hash;
 };
 
+struct ClientACK {
+    std::string message_identifier;
+    std::string handshake_identifier;
+    std::string server_hash;
+};
+
+struct ServerACK {
+    std::string message_identifier;
+    std::string handshake_identifier;
+    std::string client_hash;
+};
+
+struct HandshakeRST {
+    std::string message_identifier;
+    std::string handshake_identifier;
+    std::string error_message;
+};
 
 class TunnelManager {
     public:
