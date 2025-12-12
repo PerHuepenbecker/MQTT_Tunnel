@@ -4,11 +4,32 @@
 #include "mqtt_client_wrapper.h"
 
 
-struct SessionConfig{
+struct SessionConfig {
     std::string client_id;
     std::string client_address;
     std::string topic_inbound;
     std::string topic_outbound;
+};
+
+// Client Hello for initiating a session handshake
+
+struct ClientHello {
+    std::string client_base_id;
+    bool authentication;
+    std::string auth_data; // optional authentication or identification data
+    std::string handshake_identifier; // 256 bit random number
+    std::string data_hash;
+};
+
+// Server Hello for client configuration
+
+struct ServerHello {
+    std::string handshake_identifier;
+    std::string assigned_client_id_;
+    std::string assigned_client_ip;
+    std::string assigned_inbound_topic;
+    std::string assigned_outbound_topic;
+    std::string data_hash;
 };
 
 
