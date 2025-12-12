@@ -1,8 +1,8 @@
 #include "ip_pool.h"
 
 IPPool::IPPool(const std::string& net_ip, int pool_size){
-        base_ip_ = net_ip_.substr(0, net_ip_.rfind('.') + 1);
-        if(net_ip_.empty() || pool_size_ <=0 || pool_size_ > 253){
+        
+        if(net_ip.empty() || pool_size <=0 || pool_size > 253){
             throw std::invalid_argument("Invalid network IP or pool size");
         }
 
@@ -10,7 +10,9 @@ IPPool::IPPool(const std::string& net_ip, int pool_size){
             throw std::invalid_argument("Currently only /24 networks are supported with base IP ending in .0");
         }
 
+        
         net_ip_ = net_ip;
+        base_ip_ = net_ip.substr(0, net_ip_.rfind('.') + 1);
         pool_size_ = pool_size;
         ip_usage_.resize(pool_size_, false);
 }
