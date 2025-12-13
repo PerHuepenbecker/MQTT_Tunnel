@@ -272,6 +272,13 @@ Es wird prinzipiell die Möglichkeit zur Einbindung einer SSL-Verschlüsslung er
 
 ## 4.1 Entwicklungsumgebung
 
+Die Implementierung und Erprobung des MQTT-basierten Tunnels erfolgte in einer virtualisierten Testumgebung auf Basis von Oracle VirtualBox.
+Hierzu wurden zwei virtuelle Maschinen mit Debian Linux eingesetzt, die identisch konfiguriert wurden.
+
+Beide virtuellen Maschinen verfügen über zwei Netzwerkschnittstellen. Eine Schnittstelle ist als NAT-Interface ausgeführt und ermöglicht den Zugriff auf externe Netzwerke. Die zweite Schnittstelle ist als Host-Only-Netzwerk konfiguriert und dient der direkten Kommunikation zwischen den virtuellen Maschinen sowie dem Hostsystem.
+
+Die virtuelle Maschine VM A ist im Host-Only-Netzwerk unter der IP-Adresse 192.168.56.101 erreichbar, VM B unter der IP-Adresse 192.168.56.102. Der Zugriff auf die Systeme erfolgt über dedizierte Benutzerkonten mittels SSH.
+
 ## 4.2 Aufbau der Software
 
 ## 4.3 TUN-Device-Anbindung
@@ -283,9 +290,6 @@ Es wird prinzipiell die Möglichkeit zur Einbindung einer SSL-Verschlüsslung er
 ---
 
 # 5. Tests und Analyse
-
-Für den versuch wurden zwei Debian VMs aufgebaut. mqtt-vm-a und mqtt-vm-b
-1 CPU, 2GB RAM, 2 NICs (extern und internes Netz -> mqtt-net)
 
 ## 5.1 Funktionale Tests
 
