@@ -284,6 +284,9 @@ Es wird prinzipiell die Möglichkeit zur Einbindung einer SSL-Verschlüsslung er
 
 # 5. Tests und Analyse
 
+Für den versuch wurden zwei Debian VMs aufgebaut. mqtt-vm-a und mqtt-vm-b
+1 CPU, 2GB RAM, 2 NICs (extern und internes Netz -> mqtt-net)
+
 ## 5.1 Funktionale Tests
 
 ## 5.2 Performance und Latenz
