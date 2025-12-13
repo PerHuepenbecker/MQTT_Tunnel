@@ -290,7 +290,6 @@ Für die Durchführung der Tests wurden folgende Benutzerkonten verwendet:
 - **mqtt-vm-a:** Benutzer **usera**
 - **mqtt-vm-b:** Benutzer **userb**
 
-Vor Beginn der Implementierung wurde überprüft, dass Netzwerkverbindungen zwischen Host und virtuellen Maschinen sowie der SSH-Zugriff auf beide Systeme ordnungsgemäß funktionieren. Der verifizierte Ausgangszustand der virtuellen Maschinen wurde anschließend mittels VirtualBox-Snapshots gesichert, um während der weiteren Arbeit jederzeit auf einen definierten und reproduzierbaren Startzustand zurückgreifen zu können.
 
 ## 4.2 Aufbau der Software
 
