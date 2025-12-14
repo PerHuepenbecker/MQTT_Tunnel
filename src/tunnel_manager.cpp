@@ -4,9 +4,8 @@
 TunnelManager::TunnelManager(std::string command_channel_name, std::string client_base_id,std::string broker_address){
     command_channel_name_ = command_channel_name;
 
-    mqtt_command_client_ = std::make_unique<MQTTClientWrapper>(broker_address, client_base_id + "_cmd");
+    mqtt_command_client_ = std::make_unique<mqtt::client>(broker_address, client_base_id + "_cmd");
 }
-
 
 SessionConfig TunnelManager::setup_session(){
 
@@ -36,7 +35,25 @@ SessionConfig TunnelManager::setup_session(){
                       << client_hello.handshake_identifier;
 
     client_hello.data_hash = get_sha256_string(concatenated_data.str());
+
+    mqtt_command_client_->connect();
+    mqtt_command_client_->subscribe(command_channel_name_, 1);
+    mqtt::message_ptr pubmsg = mqtt::make_message(command_channel_name_, concatenated_data.str() + "|" + client_hello.data_hash);
+    pubmsg->set_qos(1);
+    mqtt_command_client_->publish(pubmsg);
+
+    mqtt::const_message_ptr msg = mqtt_command_client_->consume_message();
+    if(!msg) {
+        throw std::runtime_error("Failed to receive Server Hello message");
+    }
+
     
+
+
+    
+
+
+
     // Expecting Server hello message with assigned cliet ID, client IP-address for TUN-Device and topic set for the data channel
 
     // Client ack message to finalize session setup
@@ -45,3 +62,4 @@ SessionConfig TunnelManager::setup_session(){
 
     return config;
 }
+
