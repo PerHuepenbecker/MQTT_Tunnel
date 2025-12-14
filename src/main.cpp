@@ -7,8 +7,6 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
-#include <MQTTClient.h>
-
 // Function to create a TUN device. 
 
 int tun_create(const char *dev) {
@@ -42,30 +40,6 @@ int tun_create(const char *dev) {
 }
 
 int tun_fd_static = -1;
-
-
-
-int mqtt_incoming_message_callback(void* context, char* topic_name, int topic_len, MQTTClient_message* message) {
-    
-    if (tun_fd_static < 0) {
-        std::cerr << "TUN device not initialized" << std::endl;
-        return 0;
-    }
-
-    unsigned char* data = static_cast<unsigned char*>(message->payload);
-    int len = message->payloadlen;
-
-    int bytes_written = write(tun_fd_static, data, len);
-    if (bytes_written < 0) {
-        std::cerr << "Error writing to TUN device: " << strerror(errno) << std::endl;
-    } 
-
-    MQTTClient_freeMessage(&message);
-    MQTTClient_free(topic_name);
-
-    return 1;
-}
-
 
 
 int main(int argc, char** argv) {
@@ -134,51 +108,7 @@ int main(int argc, char** argv) {
     system("ip link set tun0 up");
     system(ip_addr_dst);    
 
-    // MQTT Client setup
 
-    MQTTClient client;
-    MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-    MQTTClient_create(&client, broker_address, client_id, MQTTCLIENT_PERSISTENCE_NONE, NULL);
-    conn_opts.keepAliveInterval = 20;
-    conn_opts.cleansession = 1;
-
-    MQTTClient_setCallbacks(client, NULL, NULL, mqtt_incoming_message_callback, NULL);
-
-    int rc = MQTTClient_connect(client, &conn_opts);
-    if(rc != MQTTCLIENT_SUCCESS) {
-        std::cerr << "Failed to connect to MQTT broker, return code: " << rc << std::endl;
-        std::cerr << "Broker address: " << broker_address << std::endl;
-        return 1;
-    }
     
-    MQTTClient_subscribe(client, inbound_topic, 1);
-    
-    unsigned char buffer[2000];
-
-    while(1){
-
-        int read_bytes = read(tun_fd, buffer, sizeof(buffer));
-        if (read_bytes < 0) {
-            std::cerr << "Error reading from TUN device: " << strerror(errno) << std::endl;
-            break;
-        }
-
-        MQTTClient_message pubmsg = MQTTClient_message_initializer;
-        pubmsg.payload = buffer;
-        pubmsg.payloadlen = read_bytes;
-        pubmsg.qos = 0;
-        pubmsg.retained = 0;
-
-        MQTTClient_deliveryToken token;
-        int return_code = MQTTClient_publishMessage(client, outbound_topic, &pubmsg, &token);
-        
-        if (return_code != MQTTCLIENT_SUCCESS) {
-            std::cerr << "Failed to publish message, return code is " << return_code << std::endl;
-        } else {
-            std::cout << "Written " << read_bytes << " bytes" << std::endl;
-        }
-    }
-
-    close(tun_fd);
     return 0;
 }
