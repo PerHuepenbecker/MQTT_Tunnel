@@ -2,6 +2,33 @@
 #include <sstream>
 #include <cereal/archives/json.hpp>
 
+template <typename MessageType>
+class MessageSerializer{
+    public:
+    static std::string to_string(const MessageType &message) {
+        std::ostringstream oss;
+        {
+            cereal::JSONOutputArchive(oss);
+            archive(message)
+        }
+
+        return oss.str();
+    }
+
+    static MessageType from_string(const std::string& str){
+        MessageType message;
+
+        std::istringstream iss;
+
+        {
+            cereal::JSONInputArchive(iss);
+            archive(str);
+        }
+
+        return msg;
+    }
+};
+
 // Client Hello for initiating a session handshake
 
 struct ClientHello {
@@ -25,28 +52,11 @@ struct ClientHello {
     } 
 
     std::string to_string() const {
-        std::ostringstream oss;
-
-        {
-            cereal::JSONOutputArchive archive(oss);
-
-            archive(*this);
-        }
-
-        return oss.str();
+        return MessageSerializer<ClientHello>::to_string(*this);
     }
 
     static ClientHello from_string(const std::string& str) {
-        ClientHello ch;
-        std::istringstream iss(str);
-
-        {
-            cereal::JSONInputArchive archive(iss);
-
-            archive(ch);
-        }
-
-        return ch;
+        return MessageSerializer<ClientHello>::from_string(str);
     }
 };
 
@@ -73,28 +83,11 @@ struct ServerHello {
     }   
 
     std::string to_string() const {
-        std::ostringstream oss;
-
-        {
-            cereal::JSONOutputArchive archive(oss);
-
-            archive(*this);
-        }
-
-        return oss.str();
+        return MessageSerializer<ServerHello>::to_string(*this);   
     }
 
     static ServerHello from_string(const std::string& str) {
-        ServerHello sh;
-        std::istringstream iss(str);
-
-        {
-            cereal::JSONInputArchive archive(iss);
-
-            archive(sh);
-        }
-
-        return sh;
+        return MessageSerializer<ServerHello>::from_string(str);
     }
 };
 
@@ -111,28 +104,11 @@ struct ClientACK {
     }   
 
     std::string to_string() const {
-        std::ostringstream oss;
-
-        {
-            cereal::JSONOutputArchive archive(oss);
-
-            archive(*this);
-        }
-
-        return oss.str();
+        return MessageSerializer<ClientACK>::to_string(*this);
     }
 
     static ClientACK from_string(const std::string& str) {
-        ClientACK ca;
-        std::istringstream iss(str);
-
-        {
-            cereal::JSONInputArchive archive(iss);
-
-            archive(ca);
-        }
-
-        return ca;
+        return MessageSerializer<ClientACK>::from_string(str);
     }
 };
 
@@ -149,28 +125,11 @@ struct ServerACK {
     }   
 
     std::string to_string() const {
-        std::ostringstream oss;
-
-        {
-            cereal::JSONOutputArchive archive(oss);
-
-            archive(*this);
-        }
-
-        return oss.str();
+        return MessageSerializer<ServerACK>::to_string(*this);
     }
 
     static ServerACK from_string(const std::string& str) {
-        ServerACK sa;
-        std::istringstream iss(str);
-
-        {
-            cereal::JSONInputArchive archive(iss);
-
-            archive(sa);
-        }
-
-        return sa;
+        return MessageSerializer<ServerACK>::from_string(str);
     }
 };
 
@@ -187,27 +146,10 @@ struct HandshakeRST {
     }   
 
     std::string to_string() const {
-        std::ostringstream oss;
-
-        {
-            cereal::JSONOutputArchive archive(oss);
-
-            archive(*this);
-        }
-
-        return oss.str();
+        return MessageSerializer<HandshakeRST>::to_string(*this);
     }
 
     static HandshakeRST from_string(const std::string& str) {
-        HandshakeRST hrst;
-        std::istringstream iss(str);
-
-        {
-            cereal::JSONInputArchive archive(iss);
-
-            archive(hrst);
-        }
-
-        return hrst;
+        return MessageSerializer<HandshakeRST>::from_string(str);
     }
 };
