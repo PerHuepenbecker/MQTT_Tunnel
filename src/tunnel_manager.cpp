@@ -72,7 +72,7 @@ SessionConfig TunnelManager::setup_session(){
 
 
 void TunnelManager::connect_data_channel(){
-    
+
     if(!session_configured_){
         std::cerr << "Session not configured. Cannot connect data channel." << std::endl;
         std::cerr << "Start session setup..." << std::endl;
@@ -96,4 +96,21 @@ void TunnelManager::connect_data_channel(){
     
     std::cout << "Data channel connected" << std::endl;
 
+}
+
+
+void TunnelManager::async_tun_read(){
+    std::vector <char> buffer (1500); // MTU size for TUN device
+
+    while(true) {
+        ssize_t read_bytes = read(tun_fd_, buffer.data(), buffer.size());
+        if(read_bytes < 0) {
+            throw std::system_error(errno, std::generic_category(), "Failed to read from TUN device");
+        }
+
+        mqtt::message_ptr pubmsg = mqtt::make_message(session_config_.topic_outbound, std::string(buffer.data(), read_bytes));
+        pubmsg->set_qos(1);
+        mqtt_data_client_->publish(pubmsg);
+
+    }
 }

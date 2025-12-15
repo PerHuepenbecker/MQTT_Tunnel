@@ -32,10 +32,13 @@ class TunnelManager {
 
         SessionConfig session_config_;
         bool session_configured_ = false;
+        int tun_fd_;
 
         SessionConfig setup_session(); // establishes session via command channel using the preshared channel name variable
 
         void connect_data_channel();
+        void async_tun_read();
+
 
         class CommandClientCallback : public virtual mqtt::callback {
 
