@@ -65,6 +65,7 @@ struct ServerHello {
     std::string handshake_identifier;
     std::string assigned_client_id_;
     std::string assigned_client_ip;
+    std::string server_address;
     std::string assigned_inbound_topic;
     std::string assigned_outbound_topic;
 
@@ -74,6 +75,7 @@ struct ServerHello {
                 CEREAL_NVP(handshake_identifier),
                 CEREAL_NVP(assigned_client_id_),
                 CEREAL_NVP(assigned_client_ip),
+                CEREAL_NVP(server_address),
                 CEREAL_NVP(assigned_inbound_topic),
                 CEREAL_NVP(assigned_outbound_topic));
     }   

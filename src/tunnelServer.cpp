@@ -8,12 +8,32 @@ TunnelServer::TunnelServer(const std::string& broker_address, const std::string&
       command_channel_name_(command_channel_name) {};
 
 void TunnelServer::start_server() {
+
+    // Old block for setting up TUN device IP address via system calls in C
+    // Replace with netlink based config later or C++ wrapper library
+
+    own_ip_address_ = ip_pool_.get_base_ip() + "1"; // currently fixed gateway address for server side in the /24 pool
+     
+    char ip_addr_own[100];
+    //char ip_addr_dst[100];
+
+    snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", own_ip_address_.c_str());
+
+    system(ip_addr_own);
+    system("ip link set tun0 up");
+
+    spdlog::info("TUN device configured with IP: {}", own_ip_address_);
+
+    //snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", dst_address);
+
     connect_command_channel();
     connect_data_channel();
     server_running_ = true;
 
     tunnel_active_ = true; // setting the atomic flag for async coordination
     tun_read_async_thread_ = std::thread(&TunnelServer::async_tun_read, this); // start async TUN read thread 
+
+    spdlog::info("Tunnel server started");
 
     while (server_running_) {
         auto& command_channel = mqtt_channels_.get_command_client();
@@ -68,6 +88,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         SessionConfig session_config;
         session_config.client_id = client_hello.client_base_id;
         session_config.client_address = assigned_ip;
+        session_config.server_address = own_ip_address_;
         session_config.topic_inbound = inbound_topic;
         session_config.topic_outbound = outbound_topic;
 
@@ -77,6 +98,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         server_hello.handshake_identifier = client_hello.handshake_identifier;
         server_hello.assigned_client_id_ = client_hello.client_base_id;
         server_hello.assigned_client_ip = assigned_ip;
+        server_hello.server_address = own_ip_address_;
         server_hello.assigned_inbound_topic = inbound_topic;
         server_hello.assigned_outbound_topic = outbound_topic;
 
@@ -109,6 +131,13 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
 
         spdlog::info("Sent Server ACK to client ID: {}", client_hello.client_base_id);
 
+        // Here also old system call based route setup - replace asap
+
+        char ip_addr_dst[100];
+        snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", assigned_ip.c_str());
+        system(ip_addr_dst);
+
+        // End of old system call based route setup block
         
         active_clients_.add_session(assigned_ip, session_config);
         spdlog::info("Session established for client ID: {} with IP: {}", client_hello.client_base_id, assigned_ip);

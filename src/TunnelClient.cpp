@@ -75,7 +75,20 @@ void TunnelClient::setup_session() {
     if (server_ack.handshake_identifier != client_hello.handshake_identifier) {
         throw std::runtime_error("Handshake identifier mismatch in Server ACK");
     }
-    spdlog::info("Received Server ACK, session setup complete");
+    spdlog::info("Received Server ACK, session handshake complete");
+
+    char ip_addr_own[100];
+    char ip_addr_dst[100];
+
+    snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", session_config_.client_address.c_str());
+    snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", session_config_.server_address.c_str());
+
+    system(ip_addr_own);
+    system("ip link set tun0 up");
+
+    spdlog::info("TUN device configured with IP: {}", session_config_.client_address);
+    spdlog::info("Route to server address {} added", session_config_.server_address);
+
     session_configured_ = true;
 };
 
