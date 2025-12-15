@@ -10,6 +10,7 @@ find_package(GTest REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(PahoMqttCpp REQUIRED)
 find_package(cereal CONFIG REQUIRED)
+find_package(spdlog REQUIRED)
 
 include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${OPENSSL_INCLUDE_DIR})
@@ -17,12 +18,15 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 add_executable(mqtt_tunnel src/main.cpp)
 
 target_link_libraries(mqtt_tunnel 
-    PRIVATE
     PahoMqttCpp::paho-mqttpp3
     pthread
     OpenSSL::SSL
     OpenSSL::Crypto
 )
+
+
+
+target_link_libraries(mqtt_tunnel )
 
 
 add_executable(mqtt_tunnel_tests
