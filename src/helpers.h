@@ -1,8 +1,12 @@
+#pragma once
+
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <string>
 #include <iomanip>
 #include <sstream>
+#include <arpa/inet.h>
+
 
 std::string get_sha256_string(const std::string& data) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
@@ -18,4 +22,10 @@ std::string get_sha256_string(const std::string& data) {
     }
 
     return ss.str();
+}
+
+std::string ip_to_string(uint32_t ip_addr) {
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &ip_addr, ip_str, INET_ADDRSTRLEN);
+    return std::string(ip_str);
 }
