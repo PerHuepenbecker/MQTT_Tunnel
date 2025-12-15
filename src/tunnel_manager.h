@@ -4,6 +4,7 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
+#include <atomic>
 #include "mqtt_client_wrapper.h"
 #include "messages.h"
 #include "TunCallback.hpp"
@@ -19,7 +20,6 @@ struct SessionConfig {
 };
 
 
-
 class TunnelManager {
     public:
         TunnelManager(std::string commad_channel_name, std::string client_base_id, std::string broker_address);
@@ -33,14 +33,11 @@ class TunnelManager {
         SessionConfig session_config_;
         bool session_configured_ = false;
         int tun_fd_;
+        std::atomic<bool> tunnel_active_{false}; // Atomic flag to control the tunnel state in a separate thread
 
         SessionConfig setup_session(); // establishes session via command channel using the preshared channel name variable
 
         void connect_data_channel();
         void async_tun_read();
 
-
-        class CommandClientCallback : public virtual mqtt::callback {
-
-        };
 };

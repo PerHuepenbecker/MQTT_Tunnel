@@ -102,7 +102,7 @@ void TunnelManager::connect_data_channel(){
 void TunnelManager::async_tun_read(){
     std::vector <char> buffer (1500); // MTU size for TUN device
 
-    while(true) {
+    while(tunnel_active_) {
         ssize_t read_bytes = read(tun_fd_, buffer.data(), buffer.size());
         if(read_bytes < 0) {
             throw std::system_error(errno, std::generic_category(), "Failed to read from TUN device");
