@@ -2,12 +2,14 @@
 
 // C based TUN device creation and configuration function wrapper
 
-TunDevice::TunDevice(){
+TunDevice::TunDevice(const std::string& device_name) {
     struct ifreq ifr;
     int fd, err;
 
+    spdlog::info("Creating TUN device: {}", device_name);
+
     if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
-        std::cerr << "open(/dev/net/tun) failed: " << strerror(errno) << std::endl;
+        spdlog::error("open(/dev/net/tun) failed: {}", strerror(errno));
         tun_fd_ = fd;
         return;
     }
@@ -15,12 +17,20 @@ TunDevice::TunDevice(){
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
 
+    memset(&ifr, 0, sizeof(ifr));
+    ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
+    if (device_name.size() > 0) {
+        strncpy(ifr.ifr_name, device_name.c_str(), IFNAMSIZ);
+    }
+
     if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
-        std::cerr << "ioctl(TUNSETIFF) failed: " << strerror(errno) << std::endl;
+        spdlog::error("ioctl(TUNSETIFF) failed: {}", strerror(errno));
         close(fd);
         tun_fd_ = err;
         return;
     }
+
+    spdlog::info("TUN device {} created", ifr.ifr_name);
 
     tun_fd_ = fd;
 }
@@ -31,4 +41,5 @@ TunDevice::~TunDevice(){
     if(tun_fd_ >= 0){
         close(tun_fd_);
     }
+    spdlog::info("TUN device closed");
 }

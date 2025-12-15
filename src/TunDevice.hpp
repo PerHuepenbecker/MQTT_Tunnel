@@ -9,9 +9,11 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
+#include <spdlog/spdlog.h>
+
 class TunDevice {
     public:
-        TunDevice();
+        TunDevice(const std::string& device_name);
         ~TunDevice();
 
         int fd() const {
