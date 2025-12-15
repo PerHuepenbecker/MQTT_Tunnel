@@ -5,7 +5,6 @@
 #include <sstream>
 #include <iomanip>
 #include <atomic>
-#include "mqtt_client_wrapper.h"
 #include "messages.h"
 #include "TunCallback.hpp"
 
