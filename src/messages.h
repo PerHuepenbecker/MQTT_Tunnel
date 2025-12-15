@@ -37,7 +37,6 @@ struct ClientHello {
     bool authentication;
     std::string auth_data; // optional authentication or identification data
     std::string handshake_identifier; // 256 bit random number
-    std::string data_hash;
 
     // using cereal for robust serialization
 
@@ -47,8 +46,7 @@ struct ClientHello {
                 CEREAL_NVP(client_base_id),
                 CEREAL_NVP(authentication),
                 CEREAL_NVP(auth_data),
-                CEREAL_NVP(handshake_identifier),
-                CEREAL_NVP(data_hash));
+                CEREAL_NVP(handshake_identifier));
     } 
 
     std::string to_string() const {
@@ -69,7 +67,6 @@ struct ServerHello {
     std::string assigned_client_ip;
     std::string assigned_inbound_topic;
     std::string assigned_outbound_topic;
-    std::string data_hash;
 
     template <class Archive>
     void serialize(Archive& archive) {
@@ -78,8 +75,7 @@ struct ServerHello {
                 CEREAL_NVP(assigned_client_id_),
                 CEREAL_NVP(assigned_client_ip),
                 CEREAL_NVP(assigned_inbound_topic),
-                CEREAL_NVP(assigned_outbound_topic),
-                CEREAL_NVP(data_hash));
+                CEREAL_NVP(assigned_outbound_topic));
     }   
 
     std::string to_string() const {
@@ -94,13 +90,11 @@ struct ServerHello {
 struct ClientACK {
     std::string message_identifier;
     std::string handshake_identifier;
-    std::string server_hash;
 
     template <class Archive>
     void serialize(Archive& archive) {
         archive(CEREAL_NVP(message_identifier),
-                CEREAL_NVP(handshake_identifier),
-                CEREAL_NVP(server_hash));
+                CEREAL_NVP(handshake_identifier));
     }   
 
     std::string to_string() const {
@@ -115,13 +109,11 @@ struct ClientACK {
 struct ServerACK {
     std::string message_identifier;
     std::string handshake_identifier;
-    std::string client_hash;
 
     template <class Archive>
     void serialize(Archive& archive) {
         archive(CEREAL_NVP(message_identifier),
-                CEREAL_NVP(handshake_identifier),
-                CEREAL_NVP(client_hash));
+                CEREAL_NVP(handshake_identifier));
     }   
 
     std::string to_string() const {
