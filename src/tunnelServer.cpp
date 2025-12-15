@@ -12,6 +12,9 @@ void TunnelServer::start_server() {
     connect_data_channel();
     server_running_ = true;
 
+    tunnel_active_ = true; // setting the atomic flag for async coordination
+    tun_read_async_thread_ = std::thread(&TunnelServer::async_tun_read, this); // start async TUN read thread 
+
     while (server_running_) {
         auto& command_channel = mqtt_channels_.get_command_client();
         mqtt::const_message_ptr msg = command_channel.consume_message();
@@ -23,10 +26,97 @@ void TunnelServer::start_server() {
 }
 
 
-void TunnelServer::stop_server() {}
+void TunnelServer::stop_server() {
+    server_running_ = false;
+    tunnel_active_ = false;
+
+    if (tun_read_async_thread_.joinable()) {
+        tun_read_async_thread_.join();
+        spdlog::info("TUN read thread joined");
+    }
+
+    if (command_channel_connected_) {
+        mqtt_channels_.get_command_client().disconnect();
+        command_channel_connected_ = false;
+        spdlog::info("Command channel disconnected");
+    }
+
+    if (data_channel_connected_) {
+        mqtt_channels_.get_data_client().disconnect()->wait();
+        data_channel_connected_ = false;
+        spdlog::info("Data channel disconnected");
+    }
+
+    
+}
+
+// Vulnerable session handshake handler - currently blocking and interruptable by other clients connecting at the same time
+// Asynchronous handling with state machines per client would be more robust
+// Current implementation for mvp testing 
 
 void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
-    // Placeholder for handshake handling logic
+
+    try {
+        ClientHello client_hello = ClientHello::from_string(msg->get_payload());
+
+        spdlog::info("Received Client Hello from client ID: {}", client_hello.client_base_id);
+
+        std::string assigned_ip = ip_pool_.allocate_ip();
+        std::string inbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/A";
+        std::string outbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/B";
+
+        SessionConfig session_config;
+        session_config.client_id = client_hello.client_base_id;
+        session_config.client_address = assigned_ip;
+        session_config.topic_inbound = inbound_topic;
+        session_config.topic_outbound = outbound_topic;
+
+        
+        ServerHello server_hello;
+        server_hello.message_identifier = "SERVER_HELLO";
+        server_hello.handshake_identifier = client_hello.handshake_identifier;
+        server_hello.assigned_client_id_ = client_hello.client_base_id;
+        server_hello.assigned_client_ip = assigned_ip;
+        server_hello.assigned_inbound_topic = inbound_topic;
+        server_hello.assigned_outbound_topic = outbound_topic;
+
+        mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_, server_hello.to_string());
+        hello_msg->set_qos(1);
+        mqtt_channels_.get_command_client().publish(hello_msg);
+
+        spdlog::info("Sent Server Hello to client ID: {}", client_hello.client_base_id);
+
+        
+        mqtt::const_message_ptr ack_msg = mqtt_channels_.get_command_client().consume_message();
+        if(!ack_msg) {
+            throw std::runtime_error("Failed to receive Client ACK message");
+        }
+
+        ClientACK client_ack = ClientACK::from_string(ack_msg->get_payload());
+        if(client_ack.handshake_identifier != client_hello.handshake_identifier) {
+            throw std::runtime_error("Handshake identifier mismatch in Client ACK");
+        }
+
+        spdlog::info("Received Client ACK from client ID: {}", client_hello.client_base_id);
+
+        
+        ServerACK server_ack;
+        server_ack.message_identifier = "SERVER_ACK";
+        server_ack.handshake_identifier = client_hello.handshake_identifier;
+        mqtt::message_ptr server_ack_msg = mqtt::make_message(command_channel_name_, server_ack.to_string());
+        server_ack_msg->set_qos(1);
+        mqtt_channels_.get_command_client().publish(server_ack_msg);    
+
+        spdlog::info("Sent Server ACK to client ID: {}", client_hello.client_base_id);
+
+        
+        active_clients_.add_session(assigned_ip, session_config);
+        spdlog::info("Session established for client ID: {} with IP: {}", client_hello.client_base_id, assigned_ip);
+
+    } catch (const std::exception& e) {
+        spdlog::error("Error handling client handshake: {}", e.what());
+    }
+
 }
 
 void TunnelServer::connect_command_channel() {
@@ -75,12 +165,11 @@ void TunnelServer::async_tun_read() {
         SessionConfig session;
         if(!active_clients_.get_session(dest_ip, session)) {
             spdlog::warn("No active session for destination IP: {}", dest_ip);
-            continue; // No active session for this IP
+            continue; 
         }
     
         mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_outbound, std::string(buffer.data(), read_bytes));
         pubmsg->set_qos(1);
         mqtt_channels_.get_data_client().publish(pubmsg);
-
     }
 };
