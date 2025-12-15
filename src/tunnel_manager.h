@@ -6,6 +6,7 @@
 #include <iomanip>
 #include "mqtt_client_wrapper.h"
 #include "messages.h"
+#include "TunCallback.hpp"
 
 #include <mqtt/client.h>
 #include <mqtt/async_client.h>
@@ -27,11 +28,14 @@ class TunnelManager {
         std::string command_channel_name_; // Variable to indentify the command channel - only information to be preshared
         std::unique_ptr<mqtt::client> mqtt_command_client_; // Two MQTT clients here for clear channel separation
         std::unique_ptr<mqtt::async_client> mqtt_data_client_;    // One for command/control, one for tunneled data transfer;
+        std::shared_ptr<TunCallback> tun_callback_; // Callback for data channel to write incoming messages to TUN device
 
         SessionConfig session_config_;
-        bool session_established_ = false;
+        bool session_configured_ = false;
 
         SessionConfig setup_session(); // establishes session via command channel using the preshared channel name variable
+
+        void connect_data_channel();
 
         class CommandClientCallback : public virtual mqtt::callback {
 
