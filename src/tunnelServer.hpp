@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include "SessionMap.hpp"
+#include "messages.h"
 #include <netinet/ip.h>
 
 class TunnelServer;
@@ -67,6 +68,10 @@ class TunnelServer {
                         const std::string& ip_pool_base = "10.0.0.0",
                         unsigned int ip_pool_size = 253);
 
+        ~TunnelServer() {
+            stop_server();
+        }
+
         void start_server();
         void stop_server();
 
@@ -95,6 +100,7 @@ class TunnelServer {
         bool data_channel_connected_ = false;
 
         std::atomic<bool> tunnel_active_{false}; 
+        std::thread tun_read_async_thread_;
 
         void connect_command_channel();
         void connect_data_channel();
