@@ -154,7 +154,7 @@ void TunnelClient::async_tun_read() {
             pubmsg->set_qos(1);
             mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));
 
-            spdlog::debug("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
+            spdlog::info("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
         }
     }
 

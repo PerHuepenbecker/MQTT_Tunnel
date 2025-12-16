@@ -192,8 +192,13 @@ void TunnelServer::async_tun_read() {
 
     while(tunnel_active_) {
         ssize_t read_bytes = read(tun_device_.fd(), buffer.data(), buffer.size());
+
         if(read_bytes < 0) {
-            throw std::system_error(errno, std::generic_category(), "Failed to read from TUN device");
+            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                spdlog::error("Error reading from TUN device: {}", strerror(errno));
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
         }
 
         struct iphdr* ip_header = reinterpret_cast<struct iphdr*>(buffer.data());
@@ -205,6 +210,8 @@ void TunnelServer::async_tun_read() {
             spdlog::warn("No active session for destination IP: {}", dest_ip);
             continue; 
         }
+
+        spdlog::info("Read {} bytes from TUN and publishing to topic {}", read_bytes, session.topic_inbound);
     
         mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_inbound, std::string(buffer.data(), read_bytes));
         pubmsg->set_qos(1);
