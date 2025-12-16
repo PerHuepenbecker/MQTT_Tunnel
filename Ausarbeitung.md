@@ -290,9 +290,8 @@ Für die Durchführung der Tests wurden folgende Benutzerkonten verwendet:
 - **mqtt-vm-a:** Benutzer **usera**
 - **mqtt-vm-b:** Benutzer **userb**
 
-## Einrichtung der Entwicklungsumgebung (Debian)
+# Einrichtung der Entwicklungsumgebung (Debian)
 
-```bash
 # Schritt 1: Grundlegende Build- und Systemwerkzeuge
 sudo apt update
 sudo apt install -y \
@@ -336,6 +335,7 @@ mkdir -p build
 cd build
 cmake ..
 make -j$(nproc)
+
 
 
 ## 4.2 Aufbau der Software
