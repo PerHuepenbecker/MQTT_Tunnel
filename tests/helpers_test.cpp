@@ -9,10 +9,11 @@ TEST(HelpersTest, SHA256Hash) {
 }
 
 TEST(HelpersTest, ConvertIPtoString) {
-    uint32_t ip = 0xC0A80101; 
+    uint32_t ip = 0xC0A80101;
+    auto ip_network_order = htonl(ip);
     std::string expected_ip_str = "192.168.1.1";
 
-    std::string ip_str = ip_to_string(ip);
+    std::string ip_str = ip_to_string(ip_network_order);
     EXPECT_EQ(ip_str, expected_ip_str);
 }
 
