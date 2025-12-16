@@ -96,6 +96,10 @@ void TunnelClient::setup_session() {
     snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", session_config_.client_address.c_str());
     snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", session_config_.server_address.c_str());
 
+    spdlog::info("Configuring TUN device with IP and routes...");
+    spdlog::info("Executing command: {}", ip_addr_own);
+    spdlog::info("Executing command: {}", ip_addr_dst);
+
     system(ip_addr_own);
     system("ip link set tun0 up");
     system(ip_addr_dst);
