@@ -52,10 +52,9 @@ int main(int argc, char** argv) {
             client->start_tunnel();
             
             while (run) {
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep to reduce CPU usage
             }
+
             client->stop_tunnel();
         }
 
