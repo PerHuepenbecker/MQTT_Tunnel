@@ -156,8 +156,11 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
 void TunnelServer::connect_command_channel() {
     auto& command_channel = mqtt_channels_.get_command_client();
     try {
+        spdlog::info("Server: Connecting to command channel...");
         command_channel.connect();
+        spdlog::info("Server: Connected! Subscribing to topic: {}", command_channel_name_ + "_RX");
         command_channel.subscribe((command_channel_name_+"_RX"), 1);
+        spdlog::info("Server: Subscribed successfully");
         command_channel_connected_ = true;
 
     } catch (const mqtt::exception& exc) {

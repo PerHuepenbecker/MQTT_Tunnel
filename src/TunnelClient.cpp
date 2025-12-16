@@ -101,9 +101,11 @@ void TunnelClient::setup_session() {
 void TunnelClient::connect_command_channel() {
     auto& command_channel = mqtt_channels_.get_command_client();
     try {
+        spdlog::info("Connecting to command channel...");
         command_channel.connect();
+        spdlog::info("Connected! Now subscribing to topic: {}", command_channel_name_ + "_TX");
         command_channel.subscribe(command_channel_name_ + "_TX", 1);
-        
+        spdlog::info("Subscribed successfully");
         spdlog::info("Command channel connected");
     } catch (const mqtt::exception& exc) {
         spdlog::error("Error connecting to command channel: {}", exc.what());
