@@ -39,7 +39,10 @@ void TunnelServer::start_server() {
         auto& command_channel = mqtt_channels_.get_command_client();
         mqtt::const_message_ptr msg = command_channel.consume_message();
 
+        spdlog::debug("Consumed message from command channel");
+
         if (msg) {
+            spdlog::debug("Handling client handshake message");
             handle_client_handshake(msg);
         }
     }
@@ -160,7 +163,7 @@ void TunnelServer::connect_command_channel() {
         throw;
     }
 
-    std::cout << "Command channel connected" << std::endl;
+   spdlog::info("Command channel connected");
 }
  
 void TunnelServer::connect_data_channel() {
