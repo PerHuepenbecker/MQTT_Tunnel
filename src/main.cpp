@@ -1,182 +1,57 @@
-#include <iostream>
-#include <cstring>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <sys/ioctl.h>
-#include <linux/if.h>
-#include <linux/if_tun.h>
 
-#include <MQTTClient.h>
+#include "TunnelClient.hpp"
+#include "TunnelServer.hpp"
+#include "../third_party/CLI11.hpp"
 
-// Function to create a TUN device. 
-
-int tun_create(const char *dev) {
-    struct ifreq ifr;
-    int fd, err;
-
-    // Open the TUN device file
-
-    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
-        perror("open(/dev/net/tun) failed");
-        return fd;
-    }
-
-    // clear the struct and set the flags
-
-    memset(&ifr, 0, sizeof(ifr));
-    ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
-    if (*dev) {
-        strncpy(ifr.ifr_name, dev, IFNAMSIZ);
-    }
-
-    // Configure the TUN device
-
-    if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
-        perror("ioctl(TUNSETIFF) failed");
-        close(fd);
-        return err;
-    }
-
-    return fd;
-}
-
-int tun_fd_static = -1;
-
-
-int mqtt_incoming_message_callback(void* context, char* topic_name, int topic_len, MQTTClient_message* message) {
-    
-    if (tun_fd_static < 0) {
-        std::cerr << "TUN device not initialized" << std::endl;
-        return 0;
-    }
-
-    unsigned char* data = static_cast<unsigned char*>(message->payload);
-    int len = message->payloadlen;
-
-    int bytes_written = write(tun_fd_static, data, len);
-    if (bytes_written < 0) {
-        std::cerr << "Error writing to TUN device: " << strerror(errno) << std::endl;
-    } 
-
-    MQTTClient_freeMessage(&message);
-    MQTTClient_free(topic_name);
-
-    return 1;
-}
-
+enum Mode {
+    MODE_CLIENT,
+    MODE_SERVER
+};
 
 int main(int argc, char** argv) {
 
-    // definition of command line argument variables
-    
-    int opt;
-    char* broker_address = NULL;
-    char* client_id = NULL;
-    char* outbound_topic = NULL;
-    char* inbound_topic = NULL;
-    char* own_address = NULL;
-    char* dst_address = NULL;
-
-    const char *optstring = "s:d:a:c:o:i:";
-
     // parse the command line arguments
 
-    while ((opt = getopt(argc, argv, optstring)) != -1) {
-        switch (opt) {
-            case 'a':
-                broker_address = optarg;
-                break;
-            case 'c':
-                client_id = optarg;
-                break;
-            case 'o':
-                outbound_topic = optarg;
-                break;
-            case 'i':
-                inbound_topic = optarg;
-                break;
-            case 's':
-                own_address = optarg;
-                break;
-            case 'd':
-                dst_address = optarg;   
-                break;
-            default:
-                std::cerr << "Usage: " << argv[0] << "-s <own_ip_adress> -d <dst_ip_address> -a <broker_address> -c <client_id> -o <outbound_topic> -i <inbound_topic>" << std::endl;
-                return 1;
-        }
-    }
-    
+    CLI::App app{"MQTT Tunnel"};
 
-    const char *tun_name = "tun0";
-    int tun_fd = tun_create(tun_name);
-    if (tun_fd < 0) {
-        std::cerr << "Error creating TUN device" << std::endl;
+    std::string broker_address;
+    std::string client_id;
+    std::string command_channel_name = "mqtt_tunnel/commands";
+    
+    Mode mode = MODE_CLIENT;
+
+    app.add_option("-m,--mode", mode, "Mode: client or server")->required()
+        ->transform(CLI::CheckedTransformer(std::map<std::string, Mode>{{"client", MODE_CLIENT}, {"server", MODE_SERVER}}, CLI::ignore_case));
+    app.add_option("-b,--broker", broker_address, "MQTT Broker Address")->required();
+    app.add_option("-c,--client-id", client_id, "Client ID for MQTT connection")->required();
+    app.add_option("-C,--command-channel", command_channel_name, "MQTT Command Channel Name");
+    
+    CLI11_PARSE(app, argc, argv);
+
+    try {
+        if (mode == MODE_CLIENT) {
+            TunnelClientBuilder builder;
+            builder.set_broker_address(broker_address)
+                   .set_client_base_id(client_id)
+                   .set_command_channel_name(command_channel_name);
+            auto client = builder.build();
+            client->start_tunnel();
+        }
+
+        else if (mode == MODE_SERVER) {
+            TunnelServerBuilder builder;
+            builder.set_broker_address(broker_address)
+                   .set_command_channel_name(command_channel_name);
+            auto server = builder.build();
+            server->start_server();
+            
+        }
+    } catch (const std::exception& ex) {
+        spdlog::error("Exception: {}", ex.what());
         return 1;
     }
-    tun_fd_static = tun_fd;
 
-    // Can be cleaned up to use netlink
- 
-    // declare command strings for setting up TUN device
-    char ip_addr_own[100];
-    char ip_addr_dst[100];
 
-    snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", own_address);
-    snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", dst_address);
-
-    // execute commands to set up TUN device
-
-    system(ip_addr_own);
-    system("ip link set tun0 up");
-    system(ip_addr_dst);    
-
-    // MQTT Client setup
-
-    MQTTClient client;
-    MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-    MQTTClient_create(&client, broker_address, client_id, MQTTCLIENT_PERSISTENCE_NONE, NULL);
-    conn_opts.keepAliveInterval = 20;
-    conn_opts.cleansession = 1;
-
-    MQTTClient_setCallbacks(client, NULL, NULL, mqtt_incoming_message_callback, NULL);
-
-    int rc = MQTTClient_connect(client, &conn_opts);
-    if(rc != MQTTCLIENT_SUCCESS) {
-        std::cerr << "Failed to connect to MQTT broker, return code: " << rc << std::endl;
-        std::cerr << "Broker address: " << broker_address << std::endl;
-        return 1;
-    }
     
-    MQTTClient_subscribe(client, inbound_topic, 1);
-    
-    unsigned char buffer[2000];
-
-    while(1){
-
-        int read_bytes = read(tun_fd, buffer, sizeof(buffer));
-        if (read_bytes < 0) {
-            std::cerr << "Error reading from TUN device: " << strerror(errno) << std::endl;
-            break;
-        }
-
-        MQTTClient_message pubmsg = MQTTClient_message_initializer;
-        pubmsg.payload = buffer;
-        pubmsg.payloadlen = read_bytes;
-        pubmsg.qos = 0;
-        pubmsg.retained = 0;
-
-        MQTTClient_deliveryToken token;
-        int return_code = MQTTClient_publishMessage(client, outbound_topic, &pubmsg, &token);
-        
-        if (return_code != MQTTCLIENT_SUCCESS) {
-            std::cerr << "Failed to publish message, return code is " << return_code << std::endl;
-        } else {
-            std::cout << "Written " << read_bytes << " bytes" << std::endl;
-        }
-    }
-
-    close(tun_fd);
     return 0;
 }

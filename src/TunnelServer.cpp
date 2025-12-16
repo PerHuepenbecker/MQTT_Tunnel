@@ -1,0 +1,204 @@
+#include "TunnelServer.hpp"
+
+
+TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size)
+    : mqtt_channels_(broker_address, command_channel_name),
+      tun_device_(tun_device_name),
+      ip_pool_(ip_pool_base, ip_pool_size),
+      command_channel_name_(command_channel_name) {};
+
+void TunnelServer::start_server() {
+
+    // Old block for setting up TUN device IP address via system calls in C
+    // Replace with netlink based config later or C++ wrapper library
+
+    own_ip_address_ = ip_pool_.get_base_ip() + "1"; // currently fixed gateway address for server side in the /24 pool
+     
+    char ip_addr_own[100];
+    //char ip_addr_dst[100];
+
+    snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", own_ip_address_.c_str());
+
+    system(ip_addr_own);
+    system("ip link set tun0 up");
+
+    spdlog::info("TUN device configured with IP: {}", own_ip_address_);
+
+    //snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", dst_address);
+
+    connect_command_channel();
+    connect_data_channel();
+    server_running_ = true;
+
+    tunnel_active_ = true; // setting the atomic flag for async coordination
+    tun_read_async_thread_ = std::thread(&TunnelServer::async_tun_read, this); // start async TUN read thread 
+
+    spdlog::info("Tunnel server started");
+
+    while (server_running_) {
+        auto& command_channel = mqtt_channels_.get_command_client();
+        mqtt::const_message_ptr msg = command_channel.consume_message();
+
+        if (msg) {
+            handle_client_handshake(msg);
+        }
+    }
+}
+
+
+void TunnelServer::stop_server() {
+    server_running_ = false;
+    tunnel_active_ = false;
+
+    if (tun_read_async_thread_.joinable()) {
+        tun_read_async_thread_.join();
+        spdlog::info("TUN read thread joined");
+    }
+
+    if (command_channel_connected_) {
+        mqtt_channels_.get_command_client().disconnect();
+        command_channel_connected_ = false;
+        spdlog::info("Command channel disconnected");
+    }
+
+    if (data_channel_connected_) {
+        mqtt_channels_.get_data_client().disconnect()->wait();
+        data_channel_connected_ = false;
+        spdlog::info("Data channel disconnected");
+    }
+
+    
+}
+
+// Vulnerable session handshake handler - currently blocking and interruptable by other clients connecting at the same time
+// Asynchronous handling with state machines per client would be more robust
+// Current implementation for mvp testing 
+
+void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
+
+    try {
+        ClientHello client_hello = ClientHello::from_string(msg->get_payload());
+
+        spdlog::info("Received Client Hello from client ID: {}", client_hello.client_base_id);
+
+        std::string assigned_ip = ip_pool_.allocate_ip();
+        std::string inbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/A";
+        std::string outbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/B";
+
+        SessionConfig session_config;
+        session_config.client_id = client_hello.client_base_id;
+        session_config.client_address = assigned_ip;
+        session_config.server_address = own_ip_address_;
+        session_config.topic_inbound = inbound_topic;
+        session_config.topic_outbound = outbound_topic;
+
+        
+        ServerHello server_hello;
+        server_hello.message_identifier = "SERVER_HELLO";
+        server_hello.handshake_identifier = client_hello.handshake_identifier;
+        server_hello.assigned_client_id_ = client_hello.client_base_id;
+        server_hello.assigned_client_ip = assigned_ip;
+        server_hello.server_address = own_ip_address_;
+        server_hello.assigned_inbound_topic = inbound_topic;
+        server_hello.assigned_outbound_topic = outbound_topic;
+
+        mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_, server_hello.to_string());
+        hello_msg->set_qos(1);
+        mqtt_channels_.get_command_client().publish(hello_msg);
+
+        spdlog::info("Sent Server Hello to client ID: {}", client_hello.client_base_id);
+
+        
+        mqtt::const_message_ptr ack_msg = mqtt_channels_.get_command_client().consume_message();
+        if(!ack_msg) {
+            throw std::runtime_error("Failed to receive Client ACK message");
+        }
+
+        ClientACK client_ack = ClientACK::from_string(ack_msg->get_payload());
+        if(client_ack.handshake_identifier != client_hello.handshake_identifier) {
+            throw std::runtime_error("Handshake identifier mismatch in Client ACK");
+        }
+
+        spdlog::info("Received Client ACK from client ID: {}", client_hello.client_base_id);
+
+        
+        ServerACK server_ack;
+        server_ack.message_identifier = "SERVER_ACK";
+        server_ack.handshake_identifier = client_hello.handshake_identifier;
+        mqtt::message_ptr server_ack_msg = mqtt::make_message(command_channel_name_, server_ack.to_string());
+        server_ack_msg->set_qos(1);
+        mqtt_channels_.get_command_client().publish(server_ack_msg);    
+
+        spdlog::info("Sent Server ACK to client ID: {}", client_hello.client_base_id);
+
+        // Here also old system call based route setup - replace asap
+
+        char ip_addr_dst[100];
+        snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", assigned_ip.c_str());
+        system(ip_addr_dst);
+
+        // End of old system call based route setup block
+        
+        active_clients_.add_session(assigned_ip, session_config);
+        spdlog::info("Session established for client ID: {} with IP: {}", client_hello.client_base_id, assigned_ip);
+
+    } catch (const std::exception& e) {
+        spdlog::error("Error handling client handshake: {}", e.what());
+    }
+
+}
+
+void TunnelServer::connect_command_channel() {
+    auto& command_channel = mqtt_channels_.get_command_client();
+    try {
+        command_channel.connect();
+        command_channel.subscribe((command_channel_name_+"_RX"), 1);
+        command_channel_connected_ = true;
+
+    } catch (const mqtt::exception& exc) {
+        std::cerr << "Error connecting to command channel: " << exc.what() << std::endl;
+        throw;
+    }
+
+    std::cout << "Command channel connected" << std::endl;
+}
+ 
+void TunnelServer::connect_data_channel() {
+    auto& data_channel = mqtt_channels_.get_data_client();
+    try {
+        data_channel.connect()->wait();
+        data_channel_connected_ = true;
+
+    } catch (const mqtt::exception& exc) {
+        std::cerr << "Error connecting to data channel: " << exc.what() << std::endl;
+        throw;
+    }
+
+    std::cout << "Data channel connected" << std::endl;
+}
+
+void TunnelServer::async_tun_read() {
+
+    std::vector <char> buffer (1500); // MTU size for TUN device
+
+    while(tunnel_active_) {
+        ssize_t read_bytes = read(tun_device_.fd(), buffer.data(), buffer.size());
+        if(read_bytes < 0) {
+            throw std::system_error(errno, std::generic_category(), "Failed to read from TUN device");
+        }
+
+        struct iphdr* ip_header = reinterpret_cast<struct iphdr*>(buffer.data());
+        std::string dest_ip = ip_to_string(ip_header->daddr);
+
+        // Lookup session for destination IP
+        SessionConfig session;
+        if(!active_clients_.get_session(dest_ip, session)) {
+            spdlog::warn("No active session for destination IP: {}", dest_ip);
+            continue; 
+        }
+    
+        mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_outbound, std::string(buffer.data(), read_bytes));
+        pubmsg->set_qos(1);
+        mqtt_channels_.get_data_client().publish(pubmsg);
+    }
+};
