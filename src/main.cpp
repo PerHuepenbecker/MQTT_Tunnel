@@ -2,11 +2,21 @@
 #include "TunnelClient.hpp"
 #include "TunnelServer.hpp"
 #include "../third_party/CLI11.hpp"
+#include <csignal>
 
 enum Mode {
     MODE_CLIENT,
     MODE_SERVER
 };
+
+    std::atomic<bool> run{true};
+
+
+void signal_handler(int signal) {
+    std::cout << "User requested shutdown..." << std::endl;
+    run = false;
+}
+
 
 int main(int argc, char** argv) {
 
@@ -28,6 +38,10 @@ int main(int argc, char** argv) {
     
     CLI11_PARSE(app, argc, argv);
 
+    std::signal(SIGINT, signal_handler);
+
+  
+
     try {
         if (mode == MODE_CLIENT) {
             TunnelClientBuilder builder;
@@ -36,7 +50,13 @@ int main(int argc, char** argv) {
                    .set_command_channel_name(command_channel_name);
             auto client = builder.build();
             client->start_tunnel();
-            pause();
+            
+            while (run) {
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            }
+            client->stop_tunnel();
         }
 
         else if (mode == MODE_SERVER) {
