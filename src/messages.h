@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 #include <sstream>
 #include <cereal/archives/json.hpp>
@@ -8,8 +10,8 @@ class MessageSerializer{
     static std::string to_string(const MessageType &message) {
         std::ostringstream oss;
         {
-            cereal::JSONOutputArchive(oss);
-            archive(message)
+            cereal::JSONOutputArchive archive(oss);
+            archive(message);
         }
 
         return oss.str();
@@ -18,14 +20,14 @@ class MessageSerializer{
     static MessageType from_string(const std::string& str){
         MessageType message;
 
-        std::istringstream iss;
+        std::istringstream iss(str);
 
         {
-            cereal::JSONInputArchive(iss);
-            archive(str);
+            cereal::JSONInputArchive archive(iss);
+            archive(message);
         }
 
-        return msg;
+        return message;
     }
 };
 
