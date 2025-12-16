@@ -290,6 +290,53 @@ Für die Durchführung der Tests wurden folgende Benutzerkonten verwendet:
 - **mqtt-vm-a:** Benutzer **usera**
 - **mqtt-vm-b:** Benutzer **userb**
 
+## Einrichtung der Entwicklungsumgebung (Debian)
+
+```bash
+# Schritt 1: Grundlegende Build- und Systemwerkzeuge
+sudo apt update
+sudo apt install -y \
+  build-essential \
+  cmake \
+  git \
+  pkg-config \
+  libssl-dev \
+  libgtest-dev \
+  libcereal-dev \
+  libspdlog-dev
+
+# Schritt 2: Google Test kompilieren und installieren
+cd /usr/src/googletest
+sudo cmake -S . -B build
+sudo cmake --build build -j$(nproc)
+sudo cmake --install build
+sudo ldconfig
+
+# Schritt 3: Eclipse Paho MQTT (C-Bibliothek) installieren
+cd ~
+git clone https://github.com/eclipse/paho.mqtt.c.git
+cd paho.mqtt.c
+cmake -S . -B build -DPAHO_WITH_SSL=ON -DPAHO_BUILD_SHARED=ON
+cmake --build build -j$(nproc)
+sudo cmake --install build
+sudo ldconfig
+
+# Schritt 4: Eclipse Paho MQTT (C++-Wrapper) installieren
+cd ~
+git clone https://github.com/eclipse/paho.mqtt.cpp.git
+cd paho.mqtt.cpp
+cmake -S . -B build
+cmake --build build -j$(nproc)
+sudo cmake --install build
+sudo ldconfig
+
+# Schritt 5: Projekt kompilieren
+cd ~/MQTT_Tunnel
+mkdir -p build
+cd build
+cmake ..
+make -j$(nproc)
+
 
 ## 4.2 Aufbau der Software
 
