@@ -8,6 +8,7 @@ TunnelClient::TunnelClient(const std::string& broker_address,
       tun_device_(tun_device_name) {}
 
 void TunnelClient::start_tunnel() {
+    connect_command_channel();
     setup_session();
     connect_data_channel();
     tunnel_active_ = true;
