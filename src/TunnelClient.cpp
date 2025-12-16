@@ -15,11 +15,16 @@ void TunnelClient::start_tunnel() {
     connect_data_channel();
     mqtt_channels_.set_tun_callback(tun_device_.fd());
     tunnel_active_ = true;
-    async_tun_read();
+    tun_read_thread_ = std::thread(&TunnelClient::async_tun_read, this);
+    spdlog::info("Tunnel client started");
 } 
 
 void TunnelClient::stop_tunnel() {
     tunnel_active_ = false;
+    if (tun_read_thread_.joinable()) {
+        tun_read_thread_.join();
+        spdlog::info("TUN read thread joined");
+    }
     mqtt_channels_.get_data_client().disconnect()->wait();
     spdlog::info("Data channel disconnected");
 }
@@ -133,6 +138,7 @@ void TunnelClient::async_tun_read() {
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
             if (bytes_read < 0) {
                 spdlog::error("Error reading from TUN device: {}", strerror(errno));
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
 
