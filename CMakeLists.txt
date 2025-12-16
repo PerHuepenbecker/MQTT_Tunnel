@@ -11,22 +11,28 @@ find_package(OpenSSL REQUIRED)
 find_package(PahoMqttCpp REQUIRED)
 find_package(cereal CONFIG REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
 
 include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-add_executable(mqtt_tunnel src/main.cpp)
+add_executable(mqtt_tunnel 
+    src/main.cpp
+    src/TunDevice.cpp
+    src/MQTTChannels.cpp
+    src/TunnelClient.cpp
+    src/TunnelServer.cpp
+    src/ip_pool.cpp
+)
 
 target_link_libraries(mqtt_tunnel 
     PahoMqttCpp::paho-mqttpp3
     pthread
     OpenSSL::SSL
     OpenSSL::Crypto
+    spdlog::spdlog
+    fmt::fmt
 )
-
-
-
-target_link_libraries(mqtt_tunnel )
 
 
 add_executable(mqtt_tunnel_tests
