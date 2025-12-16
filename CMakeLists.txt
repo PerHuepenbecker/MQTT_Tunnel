@@ -38,6 +38,8 @@ target_link_libraries(mqtt_tunnel
 add_executable(mqtt_tunnel_tests
     tests/ip_pool_test.cpp
     tests/helpers_test.cpp
+    tests/TunDevice_test.cpp
+    src/TunDevice.cpp
     src/ip_pool.cpp   
     src/helpers.h
 )
@@ -48,6 +50,8 @@ target_link_libraries(mqtt_tunnel_tests
     pthread
     OpenSSL::SSL
     OpenSSL::Crypto
+    spdlog::spdlog
+    fmt::fmt
 )
 
 include(GoogleTest)

@@ -3,6 +3,7 @@
 #include <mqtt/async_client.h>
 #include <mqtt/client.h>
 #include <system_error>
+#include <spdlog/spdlog.h>
 #include "TunCallback.hpp"
 
 
