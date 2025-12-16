@@ -11,7 +11,7 @@ class MQTTChannels {
         MQTTChannels(const std::string& broker_address, const std::string& client_base_id);
         mqtt::client& get_command_client();
         mqtt::async_client& get_data_client();
-
+        void set_tun_callback(int tun_fd);
 
     private:
         std::unique_ptr<mqtt::client> mqtt_command_client_;         // Two MQTT clients here for clear channel separation

@@ -28,6 +28,7 @@ void TunnelServer::start_server() {
 
     connect_command_channel();
     connect_data_channel();
+    mqtt_channels_.set_tun_callback(tun_device_.fd());
     server_running_ = true;
 
     tunnel_active_ = true; // setting the atomic flag for async coordination

@@ -11,6 +11,7 @@ void TunnelClient::start_tunnel() {
     connect_command_channel();
     setup_session();
     connect_data_channel();
+    mqtt_channels_.set_tun_callback(tun_device_.fd());
     tunnel_active_ = true;
     async_tun_read();
 } 
