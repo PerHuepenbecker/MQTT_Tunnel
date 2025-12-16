@@ -3,7 +3,13 @@ Educational Project - Implementation of a MQTT-Network tunnel
 
 # Dependencies
 
-paho-MQTT C-Library
+- paho-MQTT C++
+- GTest
+- OpenSSL
+- cereal 
+- spdlog
+- fmt
+
 
 # Installation
 
