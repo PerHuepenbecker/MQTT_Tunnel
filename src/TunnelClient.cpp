@@ -98,6 +98,7 @@ void TunnelClient::setup_session() {
 
     system(ip_addr_own);
     system("ip link set tun0 up");
+    system(ip_addr_dst);
 
     spdlog::info("TUN device configured with IP: {}", session_config_.client_address);
     spdlog::info("Route to server address {} added", session_config_.server_address);
@@ -149,5 +150,5 @@ void TunnelClient::async_tun_read() {
 
             spdlog::debug("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
         }
-    };
+    }
 
