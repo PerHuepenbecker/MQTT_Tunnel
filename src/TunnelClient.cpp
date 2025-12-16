@@ -41,7 +41,7 @@ void TunnelClient::setup_session() {
     hello_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(hello_msg);
 
-    spdlog::debug("Sent Client Hello, waiting for Server Hello...");
+    spdlog::info("Sent Client Hello, waiting for Server Hello...");
 
     mqtt::const_message_ptr response = mqtt_channels_.get_command_client().consume_message();
     if(!response) {
@@ -50,7 +50,7 @@ void TunnelClient::setup_session() {
 
     ServerHello server_hello = ServerHello::from_string(response->get_payload());
 
-    spdlog::debug("Received Server Hello");
+    spdlog::info("Received Server Hello");
 
     session_config_.client_id = server_hello.assigned_client_id_;
     session_config_.client_address = server_hello.assigned_client_ip;
