@@ -66,12 +66,14 @@ class TunnelClient {
         MQTTChannels mqtt_channels_;
         TunDevice tun_device_;
         std::string command_channel_name_;
+        std::string client_base_id_;
         SessionConfig session_config_;
         bool session_configured_ = false;
         std::atomic<bool> tunnel_active_{false};
         std::thread tun_read_thread_;
 
         void setup_session();
+        void connect_command_channel();
         void connect_data_channel();
         void async_tun_read();
 };

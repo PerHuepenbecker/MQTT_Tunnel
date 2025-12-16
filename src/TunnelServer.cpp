@@ -102,7 +102,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         server_hello.assigned_inbound_topic = inbound_topic;
         server_hello.assigned_outbound_topic = outbound_topic;
 
-        mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_, server_hello.to_string());
+        mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello.to_string());
         hello_msg->set_qos(1);
         mqtt_channels_.get_command_client().publish(hello_msg);
 
@@ -125,7 +125,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         ServerACK server_ack;
         server_ack.message_identifier = "SERVER_ACK";
         server_ack.handshake_identifier = client_hello.handshake_identifier;
-        mqtt::message_ptr server_ack_msg = mqtt::make_message(command_channel_name_, server_ack.to_string());
+        mqtt::message_ptr server_ack_msg = mqtt::make_message(command_channel_name_ + "_TX", server_ack.to_string());
         server_ack_msg->set_qos(1);
         mqtt_channels_.get_command_client().publish(server_ack_msg);    
 

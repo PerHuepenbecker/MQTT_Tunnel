@@ -23,7 +23,7 @@ void TunnelClient::stop_tunnel() {
 void TunnelClient::setup_session() {
     ClientHello client_hello;
     client_hello.message_identifier = "CLIENT_HELLO";
-    client_hello.client_base_id = "client_base_id"; 
+    client_hello.client_base_id =  client_base_id_;
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
     
@@ -36,7 +36,7 @@ void TunnelClient::setup_session() {
 
     client_hello.handshake_identifier = ss.str();
 
-    mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_, client_hello.to_string());
+    mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_RX", client_hello.to_string());
     hello_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(hello_msg);
 
@@ -62,7 +62,7 @@ void TunnelClient::setup_session() {
     client_ack.message_identifier = "CLIENT_ACK";
     client_ack.handshake_identifier = server_hello.handshake_identifier;
 
-    mqtt::message_ptr ack_msg = mqtt::make_message(command_channel_name_, client_ack.to_string());
+    mqtt::message_ptr ack_msg = mqtt::make_message(command_channel_name_ + "_RX", client_ack.to_string());
     ack_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(ack_msg); 
 
@@ -91,6 +91,19 @@ void TunnelClient::setup_session() {
 
     session_configured_ = true;
 };
+
+void TunnelClient::connect_command_channel() {
+    auto& command_channel = mqtt_channels_.get_command_client();
+    try {
+        command_channel.connect();
+        command_channel.subscribe(command_channel_name_ + "_TX", 1);
+        
+        spdlog::info("Command channel connected");
+    } catch (const mqtt::exception& exc) {
+        spdlog::error("Error connecting to command channel: {}", exc.what());
+        throw;
+    }
+}
 
 void TunnelClient::connect_data_channel() {
     auto& data_channel = mqtt_channels_.get_data_client();
