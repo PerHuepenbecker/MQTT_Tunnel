@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 
 
-std::string get_sha256_string(const std::string& data) {
+inline std::string get_sha256_string(const std::string& data) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     EVP_MD_CTX* context = EVP_MD_CTX_new();
     EVP_DigestInit_ex(context, EVP_sha256(), nullptr);
@@ -24,7 +24,7 @@ std::string get_sha256_string(const std::string& data) {
     return ss.str();
 }
 
-std::string ip_to_string(uint32_t ip_addr) {
+inline std::string ip_to_string(uint32_t ip_addr) {
     char ip_str[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &ip_addr, ip_str, INET_ADDRSTRLEN);
     return std::string(ip_str);
