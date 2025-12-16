@@ -5,7 +5,9 @@ TunnelClient::TunnelClient(const std::string& broker_address,
                              const std::string& client_base_id,
                              const std::string& tun_device_name)
     : mqtt_channels_(broker_address, client_base_id),
-      tun_device_(tun_device_name) {}
+      tun_device_(tun_device_name),
+      command_channel_name_(command_channel_name),
+      client_base_id_(client_base_id) {}
 
 void TunnelClient::start_tunnel() {
     connect_command_channel();
