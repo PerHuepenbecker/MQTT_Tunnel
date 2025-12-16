@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
                    .set_command_channel_name(command_channel_name);
             auto client = builder.build();
             client->start_tunnel();
+            pause();
         }
 
         else if (mode == MODE_SERVER) {
