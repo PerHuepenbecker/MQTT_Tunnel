@@ -2,6 +2,7 @@
 #include <mqtt/client.h>
 #include <system_error>
 #include <unistd.h>
+#include <spdlog/spdlog.h>
 #include "helpers.h"
 #include "SessionMap.hpp"
 
