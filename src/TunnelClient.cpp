@@ -132,8 +132,9 @@ void TunnelClient::connect_data_channel() {
 }
 
 void TunnelClient::async_tun_read() {
-    tun_read_thread_ = std::thread([this]() {
-        char buffer[1500]; // typical MTU size
+    
+    char buffer[1500];
+
         while (tunnel_active_) {
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
             if (bytes_read < 0) {
@@ -148,6 +149,5 @@ void TunnelClient::async_tun_read() {
 
             spdlog::debug("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
         }
-    });
-}
+    };
 
