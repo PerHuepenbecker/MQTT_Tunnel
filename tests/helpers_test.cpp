@@ -8,3 +8,11 @@ TEST(HelpersTest, SHA256Hash) {
     EXPECT_EQ(computed_hash, expected_hash);
 }
 
+TEST(HelpersTest, ConvertIPtoString) {
+    uint32_t ip = 0xC0A80101; 
+    std::string expected_ip_str = "192.168.1.1";
+
+    std::string ip_str = ip_to_string(ip);
+    EXPECT_EQ(ip_str, expected_ip_str);
+}
+
