@@ -62,12 +62,14 @@ void TunnelClient::setup_session() {
 
     session_config_.client_id = server_hello.assigned_client_id_;
     session_config_.client_address = server_hello.assigned_client_ip;
+    session_config_.server_address = server_hello.server_address;
     session_config_.topic_inbound = server_hello.assigned_inbound_topic;
     session_config_.topic_outbound = server_hello.assigned_outbound_topic;
     
-    spdlog::info("Session configured with Client ID: {}, IP: {}, Inbound Topic: {}, Outbound Topic: {}",
+    spdlog::info("Session configured with Client ID: {}, IP: {}, ServerIP: {} Inbound Topic: {}, Outbound Topic: {}",
                  session_config_.client_id,
                  session_config_.client_address,
+                 session_config_.server_address,
                  session_config_.topic_inbound,
                  session_config_.topic_outbound);
 
