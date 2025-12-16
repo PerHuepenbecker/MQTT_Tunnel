@@ -131,6 +131,7 @@ void TunnelClient::connect_data_channel() {
     auto& data_channel = mqtt_channels_.get_data_client();
     try {
         data_channel.connect()->wait();
+        data_channel.subscribe(session_config_.topic_inbound, 1)->wait();
         spdlog::info("Data channel connected");
     } catch (const mqtt::exception& exc) {
         spdlog::error("Error connecting to data channel: {}", exc.what());
