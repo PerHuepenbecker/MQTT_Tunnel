@@ -144,6 +144,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
 
         // End of old system call based route setup block
         
+        mqtt_channels_.get_data_client().subscribe(session_config.topic_outbound, 1)->wait();
         active_clients_.add_session(assigned_ip, session_config);
         spdlog::info("Session established for client ID: {} with IP: {}", client_hello.client_base_id, assigned_ip);
 
@@ -205,7 +206,7 @@ void TunnelServer::async_tun_read() {
             continue; 
         }
     
-        mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_outbound, std::string(buffer.data(), read_bytes));
+        mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_inbound, std::string(buffer.data(), read_bytes));
         pubmsg->set_qos(1);
         mqtt_channels_.get_data_client().publish(pubmsg);
     }
