@@ -336,7 +336,7 @@ mkdir -p build
 cd build
 cmake ..
 make -j$(nproc)
-
+```bash
 
 ## 4.2 Aufbau der Software
 
