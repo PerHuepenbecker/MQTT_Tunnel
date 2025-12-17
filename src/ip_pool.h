@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <vector>
+#include <spdlog/spdlog.h>
 
 // Class for managing a pool of IP addresses.
 // Currently supports only /24 nets
