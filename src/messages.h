@@ -149,3 +149,25 @@ struct HandshakeRST {
         return MessageSerializer<HandshakeRST>::from_string(str);
     }
 };
+
+struct SessionTermination {
+    std::string message_identifier;
+    std::string client_id;
+    std::string reason;
+
+    template <class Archive>
+    void serialize(Archive& archive) {
+        archive(CEREAL_NVP(message_identifier),
+                CEREAL_NVP(client_id),
+                CEREAL_NVP(reason));
+    }   
+
+    std::string to_string() const {
+        return MessageSerializer<SessionTermination>::to_string(*this);
+    }
+
+    static SessionTermination from_string(const std::string& str) {
+        return MessageSerializer<SessionTermination>::from_string(str);
+    }
+};
+
