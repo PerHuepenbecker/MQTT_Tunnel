@@ -23,7 +23,7 @@ void TunnelClient::stop_tunnel() {
     tunnel_active_ = false;
     if (tun_read_thread_.joinable()) {
         tun_read_thread_.join();
-        spdlog::info("TUN read thread joined");
+        spdlog::debug("TUN read thread joined");
     }
 
     // Create and send session termination message
@@ -64,7 +64,7 @@ void TunnelClient::setup_session() {
     hello_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(hello_msg);
 
-    spdlog::info("Sent Client Hello, waiting for Server Hello...");
+    spdlog::debug("Sent Client Hello, waiting for Server Hello...");
 
     mqtt::const_message_ptr response = mqtt_channels_.get_command_client().consume_message();
     if(!response) {
@@ -73,7 +73,7 @@ void TunnelClient::setup_session() {
 
     ServerHello server_hello = ServerHello::from_string(response->get_payload());
 
-    spdlog::info("Received Server Hello");
+    spdlog::debug("Received Server Hello");
 
     session_config_.client_id = server_hello.assigned_client_id_;
     session_config_.client_address = server_hello.assigned_client_ip;
@@ -82,7 +82,7 @@ void TunnelClient::setup_session() {
     session_config_.topic_outbound = server_hello.assigned_outbound_topic;
     session_config_.session_id = server_hello.session_id;
     
-    spdlog::info("Session configured with Client ID: {}, IP: {}, ServerIP: {} Inbound Topic: {}, Outbound Topic: {}, Session ID: {}",
+    spdlog::debug("Session configured with Client ID: {}, IP: {}, ServerIP: {} Inbound Topic: {}, Outbound Topic: {}, Session ID: {}",
                  session_config_.client_id,
                  session_config_.client_address,
                  session_config_.server_address,
@@ -107,7 +107,7 @@ void TunnelClient::setup_session() {
     if (server_ack.handshake_identifier != client_hello.handshake_identifier) {
         throw std::runtime_error("Handshake identifier mismatch in Server ACK");
     }
-    spdlog::info("Received Server ACK, session handshake complete");
+    spdlog::debug("Received Server ACK, session handshake complete");
 
     char ip_addr_own[100];
     char ip_addr_dst[100];
@@ -115,16 +115,16 @@ void TunnelClient::setup_session() {
     snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", session_config_.client_address.c_str());
     snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", session_config_.server_address.c_str());
 
-    spdlog::info("Configuring TUN device with IP and routes...");
-    spdlog::info("Executing command: {}", ip_addr_own);
-    spdlog::info("Executing command: {}", ip_addr_dst);
+    spdlog::debug("Configuring TUN device with IP and routes...");
+    spdlog::debug("Executing command: {}", ip_addr_own);
+    spdlog::debug("Executing command: {}", ip_addr_dst);
 
     system(ip_addr_own);
     system("ip link set tun0 up");
     system(ip_addr_dst);
 
-    spdlog::info("TUN device configured with IP: {}", session_config_.client_address);
-    spdlog::info("Route to server address {} added", session_config_.server_address);
+    spdlog::debug("TUN device configured with IP: {}", session_config_.client_address);
+    spdlog::debug("Route to server address {} added", session_config_.server_address);
 
     session_configured_ = true;
 };
@@ -132,12 +132,12 @@ void TunnelClient::setup_session() {
 void TunnelClient::connect_command_channel() {
     auto& command_channel = mqtt_channels_.get_command_client();
     try {
-        spdlog::info("Connecting to command channel...");
+        spdlog::debug("Connecting to command channel...");
         command_channel.connect();
-        spdlog::info("Connected! Now subscribing to topic: {}", command_channel_name_ + "_TX");
+        spdlog::debug("Connected! Now subscribing to topic: {}", command_channel_name_ + "_TX");
         command_channel.subscribe(command_channel_name_ + "_TX", 1);
-        spdlog::info("Subscribed successfully");
-        spdlog::info("Command channel connected");
+        spdlog::debug("Subscribed successfully");
+        spdlog::debug("Command channel connected");
     } catch (const mqtt::exception& exc) {
         spdlog::error("Error connecting to command channel: {}", exc.what());
         throw;
@@ -149,7 +149,7 @@ void TunnelClient::connect_data_channel() {
     try {
         data_channel.connect()->wait();
         data_channel.subscribe(session_config_.topic_inbound, 1)->wait();
-        spdlog::info("Data channel connected");
+        spdlog::debug("Data channel connected");
     } catch (const mqtt::exception& exc) {
         spdlog::error("Error connecting to data channel: {}", exc.what());
         throw;
@@ -172,7 +172,7 @@ void TunnelClient::async_tun_read() {
             pubmsg->set_qos(1);
             mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));
 
-            spdlog::info("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
+            spdlog::debug("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
         }
     }
 
