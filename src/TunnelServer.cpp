@@ -96,7 +96,14 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         session_config.server_address = own_ip_address_;
         session_config.topic_inbound = inbound_topic;
         session_config.topic_outbound = outbound_topic;
+        
+        // Hash based approach for session ID generation
+        // TODO : Refactor message generation to be function based
+    
+        std::stringstream ss;
+        ss << session_config.client_id << "_" << std::chrono::system_clock::now().time_since_epoch().count();
 
+        session_config.session_id = get_sha256_string(ss.str());
         
         ServerHello server_hello;
         server_hello.message_identifier = "SERVER_HELLO";
@@ -106,6 +113,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         server_hello.server_address = own_ip_address_;
         server_hello.assigned_inbound_topic = inbound_topic;
         server_hello.assigned_outbound_topic = outbound_topic;
+        server_hello.session_id = session_config.session_id;
 
         mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello.to_string());
         hello_msg->set_qos(1);

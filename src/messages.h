@@ -70,6 +70,7 @@ struct ServerHello {
     std::string server_address;
     std::string assigned_inbound_topic;
     std::string assigned_outbound_topic;
+    std::string session_id;
 
     template <class Archive>
     void serialize(Archive& archive) {
@@ -79,7 +80,8 @@ struct ServerHello {
                 CEREAL_NVP(assigned_client_ip),
                 CEREAL_NVP(server_address),
                 CEREAL_NVP(assigned_inbound_topic),
-                CEREAL_NVP(assigned_outbound_topic));
+                CEREAL_NVP(assigned_outbound_topic),
+                CEREAL_NVP(session_id));
     }   
 
     std::string to_string() const {
@@ -153,12 +155,14 @@ struct HandshakeRST {
 struct SessionTermination {
     std::string message_identifier;
     std::string client_id;
+    std::string session_id; // Possible additional session identifier for proper identification
     std::string reason;
 
     template <class Archive>
     void serialize(Archive& archive) {
         archive(CEREAL_NVP(message_identifier),
                 CEREAL_NVP(client_id),
+                CEREAL_NVP(session_id),
                 CEREAL_NVP(reason));
     }   
 

@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include "SessionMap.hpp"
+#include "helpers.h"
 #include "messages.h"
 #include <netinet/ip.h>
 

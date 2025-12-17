@@ -8,4 +8,5 @@ struct SessionConfig {
     std::string server_address;
     std::string topic_inbound;
     std::string topic_outbound;
+    std::string session_id;
 };
