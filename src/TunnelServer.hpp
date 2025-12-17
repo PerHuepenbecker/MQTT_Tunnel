@@ -15,6 +15,7 @@
 #include "helpers.h"
 #include "messages.h"
 #include <netinet/ip.h>
+#include <chrono>
 
 class TunnelServer;
 
@@ -44,15 +45,21 @@ class TunnelServerBuilder {
                     return *this;
                 }
 
+                TunnelServerBuilder& set_global_run_flag(std::atomic<bool>* run_flag) {
+                    run_flag_ = run_flag;
+                    return *this;
+                }
+
                 std::unique_ptr<TunnelServer> build() {
                     if (broker_address_.empty() || command_channel_name_.empty()) {
                         throw std::runtime_error("Broker address and command channel name must be set");
                     }
 
-                    return std::make_unique<TunnelServer>(broker_address_, command_channel_name_, tun_device_name_);
+                    return std::make_unique<TunnelServer>(broker_address_, command_channel_name_, tun_device_name_, ip_pool_base_, ip_pool_size_, run_flag_);
                 }
 
             private:
+                std::atomic<bool>* run_flag_ = nullptr;
                 std::string broker_address_;
                 std::string command_channel_name_;
                 std::string tun_device_name_ = "tun0"; // default TUN device name
@@ -67,7 +74,9 @@ class TunnelServer {
                         const std::string& command_channel_name, 
                         const std::string& tun_device_name = "tun0",
                         const std::string& ip_pool_base = "10.0.0.0",
-                        unsigned int ip_pool_size = 253);
+                        unsigned int ip_pool_size = 253,
+                        std::atomic<bool>* run_flag = nullptr
+                    );
 
         ~TunnelServer() {
             stop_server();
@@ -96,9 +105,8 @@ class TunnelServer {
         std::string command_channel_name_;   // command channel name - preshared information
         SessionMap active_clients_;          // Threadsafe map of currently active clients with session info
         std::string own_ip_address_;         // IP address of the server side TUN device
+        std::atomic<bool>* global_run_flag_ = nullptr; // pointer to global run flag from main
         
-        
-        bool server_running_ = false;
         bool command_channel_connected_ = false;
         bool data_channel_connected_ = false;
 
