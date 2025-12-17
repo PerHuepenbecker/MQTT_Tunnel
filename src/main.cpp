@@ -68,7 +68,8 @@ int main(int argc, char** argv) {
         else if (mode == MODE_SERVER) {
             TunnelServerBuilder builder;
             builder.set_broker_address(broker_address)
-                   .set_command_channel_name(command_channel_name);
+                   .set_command_channel_name(command_channel_name)
+                   .set_global_run_flag(&run);
             auto server = builder.build();
             server->start_server();
             
