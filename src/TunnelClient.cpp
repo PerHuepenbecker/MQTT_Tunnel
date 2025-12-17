@@ -25,6 +25,21 @@ void TunnelClient::stop_tunnel() {
         tun_read_thread_.join();
         spdlog::info("TUN read thread joined");
     }
+
+    // Create and send session termination message
+    // TODO: proper reason codes and message generation
+
+    SessionTermination term_msg;
+    term_msg.message_identifier = "SESSION_TERMINATION";
+    term_msg.client_id = session_config_.client_id;
+    term_msg.session_id = session_config_.session_id;
+    term_msg.reason = "Client request";
+
+    mqtt::message_ptr term_mqtt_msg = mqtt::make_message(command_channel_name_ + "_RX", term_msg.to_string());
+    term_mqtt_msg->set_qos(1);
+    mqtt_channels_.get_command_client().publish(term_mqtt_msg);
+    
+
     mqtt_channels_.get_data_client().disconnect()->wait();
     spdlog::info("Data channel disconnected");
 }

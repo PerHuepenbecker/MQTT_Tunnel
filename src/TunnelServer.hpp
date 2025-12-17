@@ -97,6 +97,7 @@ class TunnelServer {
         SessionMap active_clients_;          // Threadsafe map of currently active clients with session info
         std::string own_ip_address_;         // IP address of the server side TUN device
         
+        
         bool server_running_ = false;
         bool command_channel_connected_ = false;
         bool data_channel_connected_ = false;

@@ -44,6 +44,31 @@ void TunnelServer::start_server() {
         spdlog::info("Consumed message from command channel");
 
         if (msg) {
+
+            // check if message is a session termination
+
+            if (msg->get_payload().find("SESSION_TERMINATION") != std::string::npos) {
+
+                spdlog::info("Received session termination message");
+                SessionTermination term_msg = SessionTermination::from_string(msg->get_payload());
+
+                SessionConfig dummy_config;
+
+                if (active_clients_.get_session(term_msg.client_id, dummy_config)) {
+                    spdlog::info("Terminating session for client ID: {}", term_msg.client_id);
+                } else {
+                    spdlog::warn("No active session found for client ID: {}", term_msg.client_id);
+                    continue;
+                }
+
+                active_clients_.remove_session(term_msg.client_id);
+                ip_pool_.release_ip(term_msg.client_id);
+                spdlog::info("Terminated session for client ID: {}", term_msg.client_id);
+                
+                continue;
+
+            }
+
             spdlog::info("Handling client handshake message");
             handle_client_handshake(msg);
         }
