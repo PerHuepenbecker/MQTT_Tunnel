@@ -227,6 +227,15 @@ Wie bereits im Vorfeld erwähnt, bietet MQTT keinen eigenen Mechanismus zur Fort
 
 ## 3.1 Zielsetzung
 
+## 3.1 Zielsetzung
+
+Ziel dieses Projekts ist die Entwicklung und Analyse eines Netzwerktunnels, der TCP-basierte Kommunikation über ein Message-Broker-basiertes Protokoll transportiert. Als Trägerprotokoll wird MQTT eingesetzt.
+
+Der Tunnel soll es ermöglichen, TCP-Verbindungen transparent über MQTT zu kapseln, sodass für einen externen Beobachter ausschließlich MQTT-Kommunikation zwischen Client und Broker sichtbar ist. Die eigentlichen TCP-Verbindungen sollen dabei auf Netzwerkebene verborgen bleiben.
+
+Der Schwerpunkt der Arbeit liegt auf der technischen Umsetzung des Tunnels, den zugrunde liegenden Architekturentscheidungen sowie der Analyse der Sichtbarkeit des resultierenden Datenverkehrs mittels Netzwerkanalysewerkzeugen wie tcpdump und Wireshark.
+
+
 ## 3.2 Architekturübersicht
 
 Bedingt durch die Entwicklung einer eigenen Anwendung zum Tunneln von Daten via MQTT bietet sich der Einsatz einer TUN-Device an. Ein TUN-Gerät ist eine spezifische Art von virtuellem Netzwerkgerät im Linux-Kernel, das zur Implementierung von Netzwerk-Tunneln verwendet wird, insbesondere für VPN-Dienste (Virtual Private Network).
