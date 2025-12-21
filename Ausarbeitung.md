@@ -40,7 +40,7 @@ Robin Wetzlar
 - [5. Tests und Analyse](#5-tests-und-analyse)
   - [5.1 Funktionale Tests](#51-funktionale-tests)
   - [5.2 Performance und Latenz](#52-performance-und-latenz)
-  - [5.3 Wireshark-Analyse](#53-wireshark-analyse)
+  - [5.3 tcpdump-Analyse](#53-tcpdump-analyse)
   - [5.4 Fehlerfälle](#54-fehlerfälle)
 - [6. Fazit](#6-fazit)
 - [Quellenverzeichnis](#quellenverzeichnis)
@@ -409,7 +409,7 @@ Auf dem Tunnel-Server wurde ein einfacher TCP-Listener mit `netcat` gestartet:
 
 ```bash
 nc -l -p 12345
-````
+```
 Anschließend wurde vom Tunnel-Client aus eine TCP-Verbindung über die Tunnel-IP aufgebaut und eine Testnachricht gesendet:
 
 ```bash
@@ -426,11 +426,62 @@ Damit ist die grundlegende Funktionalität des Tunnels nachgewiesen.
 
 ## 5.2 Performance und Latenz
 
-## 5.3 Wireshark-Analyse
+## 5.3 tcpdump-Analyse
+
+Zur Analyse der Sichtbarkeit des MQTT-Tunnels aus Sicht eines externen Beobachters wurden Netzwerkaufzeichnungen mit `tcpdump` durchgeführt. Ziel war es, zu untersuchen, welche Art von Netzwerkverkehr auf den beteiligten Schnittstellen sichtbar ist und ob der transportierte TCP-Verkehr als solcher erkennbar bleibt.
+
+### Analyse auf dem TUN-Interface
+
+Zunächst wurde der Netzwerkverkehr direkt auf dem TUN-Interface (`tun0`) des Tunnel-Servers aufgezeichnet. Auf dieser Schnittstelle sind die durch den Tunnel transportierten IP-Pakete sichtbar, da sie hier vom Kernel an die Tunnelanwendung übergeben bzw. von dieser wieder eingespeist werden.
+
+Die Aufzeichnung zeigt unter anderem den vollständigen TCP-Verbindungsaufbau (SYN, SYN-ACK, ACK) sowie die Übertragung der Nutzdaten. Die Testnachricht „TESTNACHRICHT“ wird dabei als Teil eines regulären TCP-Datenpakets sichtbar. Dies bestätigt, dass innerhalb des Tunnels echter TCP-Verkehr transportiert wird und der Tunnel aus Sicht des Betriebssystems wie eine normale IP-Verbindung funktioniert.
+
+### Analyse auf der physischen Netzwerkschnittstelle (ohne MQTT)
+
+Anschließend wurde der Netzwerkverkehr auf der physischen Netzwerkschnittstelle (`enp0s8`) des Tunnel-Servers aufgezeichnet, wobei MQTT-Verkehr explizit ausgeschlossen wurde (`not port 1883`). In dieser Aufzeichnung waren keine Pakete sichtbar, die auf eine direkte TCP-Verbindung zwischen Tunnel-Client und Tunnel-Server hindeuten.
+
+Insbesondere war weder die Testnachricht noch ein TCP-Handshake in Richtung der Tunnel-IP-Adressen (`10.0.0.0/24`) erkennbar. Für einen Beobachter auf dieser Schnittstelle ist somit kein Hinweis auf die tatsächlich durch den Tunnel transportierte TCP-Kommunikation vorhanden.
+
+### Analyse des MQTT-Verkehrs
+
+In einem weiteren Schritt wurde gezielt der MQTT-Verkehr auf Port 1883 aufgezeichnet. In dieser Aufzeichnung sind ausschließlich TCP-Verbindungen zwischen Tunnel-Client, Tunnel-Server und dem MQTT-Broker sichtbar. Die übertragenen Daten erscheinen dabei als regulärer MQTT-Datenverkehr mit Payloads unterschiedlicher Länge.
+
+Der Inhalt der MQTT-Nachrichten lässt ohne zusätzliche Kontextinformationen keinen direkten Rückschluss auf den darin gekapselten TCP-Verkehr zu. Insbesondere sind weder Zieladressen noch Portnummern der eigentlichen TCP-Verbindungen auf Netzwerkebene unmittelbar erkennbar.
+
+### Ergebnis der Analyse
+
+Die Analyse zeigt deutlich, dass der eigentliche TCP-Verkehr ausschließlich auf dem TUN-Interface sichtbar ist. Auf der physischen Netzwerkschnittstelle ist für einen externen Beobachter lediglich MQTT-Kommunikation zwischen den beteiligten Systemen und dem Broker erkennbar.
+
+Damit erfüllt der Tunnel das Ziel, TCP-Verkehr effektiv in MQTT zu kapseln und auf Netzwerkebene zu verbergen. Ein Dritter kann zwar feststellen, dass MQTT genutzt wird, jedoch nicht ohne weiteres erkennen, welche Art von Anwendungen oder Protokollen innerhalb des Tunnels transportiert werden.
 
 ## 5.4 Fehlerfälle
 
----
+Neben den erfolgreichen Funktionstests wurden auch verschiedene Fehlerfälle betrachtet, um das Verhalten des MQTT-Tunnels bei nicht idealen Bedingungen zu analysieren. Ziel war es zu überprüfen, wie sich der Tunnel bei fehlender Verbindung, nicht verfügbaren Diensten oder unterbrochenem Tunnelbetrieb verhält.
+
+### Fehlerfall 1: TCP-Verbindung ohne aktiven Tunnel
+
+Wird versucht, vom Tunnel-Client aus eine TCP-Verbindung zur Tunnel-IP des Servers aufzubauen, ohne dass der Tunnel-Server aktiv ist, schlägt der Verbindungsaufbau fehl. Der Client erhält in diesem Fall eine Timeout- oder Verbindungsfehler-Meldung, da keine Gegenstelle erreichbar ist.
+
+Dieses Verhalten entspricht dem einer normalen IP-Verbindung ohne erreichbaren Zielhost und zeigt, dass der Tunnel keine unerwarteten Fallback-Mechanismen verwendet.
+
+### Fehlerfall 2: Ping bei nicht aktivem Tunnel
+
+Ein ICMP-Ping an die Tunnel-IP-Adresse des Servers (`10.0.0.1`) führt bei nicht aktivem Tunnel zu einem vollständigen Paketverlust. Es werden keine ICMP-Antworten empfangen.
+
+Auch dieses Verhalten entspricht dem erwarteten Verhalten einer nicht vorhandenen oder unterbrochenen Netzwerkverbindung und bestätigt, dass der Tunnelverkehr ausschließlich über den aktiven MQTT-Tunnel abgewickelt wird.
+
+### Fehlerfall 3: Unterbrochene TCP-Sitzung
+
+Wird eine bestehende TCP-Verbindung über den Tunnel unterbrochen, beispielsweise durch das Beenden des TCP-Servers oder des Tunnel-Servers, schlägt ein erneuter Verbindungsversuch fehl. Der Client erhält in diesem Fall eine entsprechende Fehlermeldung (z. B. „Connection refused“).
+
+Der Tunnel verhält sich hierbei transparent: Die Fehlermeldungen stammen aus dem regulären TCP/IP-Stack des Betriebssystems und werden unverändert an die Anwendung weitergereicht.
+
+### Zusammenfassung der Fehlerfälle
+
+Die untersuchten Fehlerfälle zeigen, dass sich der MQTT-Tunnel bei Störungen oder Fehlkonfigurationen wie eine reguläre IP-basierte Verbindung verhält. Fehler werden nicht verborgen oder abgefangen, sondern korrekt an die jeweiligen Anwendungen weitergegeben.
+
+Dies erleichtert sowohl die Fehlersuche als auch die Bewertung des Tunnelverhaltens und trägt zu einem transparenten und nachvollziehbaren Systemverhalten bei.
+
 
 # 6. Fazit
 
@@ -457,4 +508,198 @@ Damit ist die grundlegende Funktionalität des Tunnels nachgewiesen.
 17. https://www.ibm.com/docs/de/ibm-mq/9.3.x?topic=overview-mq-telemetry-transport-protocol
 18. http://www.bbs-1.de/bbs1/umat/netze/netz8.html
 19. https://www.kernel.org/doc/html/latest/networking/tuntap.html
+
+# Anhang
+
+## Anhang A: Terminalausgaben – Tunnelbetrieb
+
+### A1: Start des MQTT-Tunnel-Servers (mqtt-vm-a)
+```bash
+usera@mqtt-vm-a:~$ cd ~/MQTT_Tunnel/build
+sudo ./mqtt_tunnel \
+  --mode server \
+  --broker 192.168.56.101 \
+  --client-id tunnel-server-a
+[sudo] password for usera:
+[2025-12-21 18:51:04.937] [info] Creating TUN device: tun0
+[2025-12-21 18:51:04.942] [info] TUN device tun0 created
+[2025-12-21 18:51:04.979] [info] TUN device configured with IP: 10.0.0.1
+[2025-12-21 18:51:04.979] [info] Server: Connecting to command channel...
+[2025-12-21 18:51:05.000] [info] Server: Connected! Subscribing to topic: mqtt_tunnel/commands_RX
+[2025-12-21 18:51:05.003] [info] Server: Subscribed successfully
+[2025-12-21 18:51:05.003] [info] Command channel connected
+Data channel connected
+[2025-12-21 18:51:06.005] [info] Tunnel server started
+[2025-12-21 18:51:06.006] [warning] No active session for destination IP: 96.164.82.55
+[2025-12-21 18:51:09.556] [warning] No active session for destination IP: 96.164.82.55
+[2025-12-21 18:51:12.616] [info] Consumed message from command channel
+[2025-12-21 18:51:12.617] [info] Handling client handshake message
+[2025-12-21 18:51:12.617] [info] Received Client Hello from client ID: tunnel-client-b
+[2025-12-21 18:51:12.660] [info] Sent Server Hello to client ID: tunnel-client-b
+[2025-12-21 18:51:12.709] [info] Received Client ACK from client ID: tunnel-client-b
+[2025-12-21 18:51:12.752] [info] Sent Server ACK to client ID: tunnel-client-b
+[2025-12-21 18:51:12.767] [info] Session established for client ID: tunnel-client-b with IP: 10.0.0.2
+[2025-12-21 18:51:14.858] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:14.858] [info] Wrote 48 bytes to TUN device
+[2025-12-21 18:51:17.270] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:17.270] [info] Wrote 48 bytes to TUN device
+[2025-12-21 18:51:18.772] [warning] No active session for destination IP: 96.164.82.55
+[2025-12-21 18:51:26.230] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:26.231] [info] Wrote 48 bytes to TUN device
+[2025-12-21 18:51:37.717] [warning] No active session for destination IP: 96.164.82.55
+[2025-12-21 18:51:44.674] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:44.675] [info] Wrote 48 bytes to TUN device
+[2025-12-21 18:51:56.810] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:56.811] [info] Read 60 bytes from TUN and publishing to topic mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:51:56.812] [info] Wrote 60 bytes to TUN device
+[2025-12-21 18:51:56.860] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:56.862] [info] Wrote 52 bytes to TUN device
+[2025-12-21 18:51:56.863] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:56.864] [info] Read 52 bytes from TUN and publishing to topic mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:51:56.864] [info] Wrote 66 bytes to TUN device
+[2025-12-21 18:52:12.532] [warning] No active session for destination IP: 96.164.82.55
+[2025-12-21 18:52:21.527] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:52:21.527] [info] Wrote 48 bytes to TUN device
+[2025-12-21 18:53:07.317] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:07.318] [info] Wrote 52 bytes to TUN device
+[2025-12-21 18:53:07.319] [info] Read 52 bytes from TUN and publishing to topic mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:53:07.364] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:07.365] [info] Wrote 52 bytes to TUN device
+[2025-12-21 18:53:08.279] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:08.280] [info] Read 40 bytes from TUN and publishing to topic mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:53:08.281] [info] Wrote 60 bytes to TUN device
+[2025-12-21 18:53:24.212] [warning] No active session for destination IP: 96.164.82.55
+[2025-12-21 18:53:39.353] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:39.353] [info] Wrote 48 bytes to TUN device
+````
+
+### B1: Start des MQTT-Tunnel-Clients (mqtt-vm-b)
+```bash
+userb@mqtt-vm-b:~$ cd ~/MQTT_Tunnel/build
+sudo ./mqtt_tunnel \
+  --mode client \
+  --broker 192.168.56.101 \
+  --client-id tunnel-client-b
+[sudo] password for userb:
+[2025-12-21 18:51:12.413] [info] Creating TUN device: tun0
+[2025-12-21 18:51:12.418] [info] TUN device tun0 created
+[2025-12-21 18:51:12.419] [info] Connecting to command channel...
+[2025-12-21 18:51:12.532] [info] Connected! Now subscribing to topic: mqtt_tunnel/commands_TX
+[2025-12-21 18:51:12.534] [info] Subscribed successfully
+[2025-12-21 18:51:12.535] [info] Command channel connected
+[2025-12-21 18:51:12.537] [info] Sent Client Hello, waiting for Server Hello...
+[2025-12-21 18:51:12.667] [info] Received Server Hello
+[2025-12-21 18:51:12.668] [info] Session configured with Client ID: tunnel-client-b, IP: 10.0.0.2, ServerIP: 10.0.0.1 Inbound Topic: mqtt_tunnel/commands/tunnel-client-b/A, Outbound Topic: mqtt_tunnel/commands/tunnel-client-b/B, Session ID: 4a7a39dff2e420e2e52a6c252f30ae7562bec4ac5fec44f4f3749586275a3d38
+[2025-12-21 18:51:12.758] [info] Received Server ACK, session handshake complete
+[2025-12-21 18:51:12.759] [info] Configuring TUN device with IP and routes...
+[2025-12-21 18:51:12.759] [info] Executing command: ip addr add 10.0.0.2/24 dev tun0
+[2025-12-21 18:51:12.760] [info] Executing command: ip route add 10.0.0.1 dev tun0
+[2025-12-21 18:51:12.813] [info] TUN device configured with IP: 10.0.0.2
+[2025-12-21 18:51:12.821] [info] Route to server address 10.0.0.1 added
+[2025-12-21 18:51:14.862] [info] Data channel connected
+[2025-12-21 18:51:14.863] [info] Tunnel client started
+[2025-12-21 18:51:14.864] [info] Read 48 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:17.277] [info] Read 48 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:26.236] [info] Read 48 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:44.675] [info] Read 48 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:56.791] [info] Read 60 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:56.820] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:51:56.820] [info] Wrote 60 bytes to TUN device
+[2025-12-21 18:51:56.866] [info] Read 52 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:56.867] [info] Read 66 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:51:56.910] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:51:56.910] [info] Wrote 52 bytes to TUN device
+[2025-12-21 18:52:21.533] [info] Read 48 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:07.323] [info] Read 52 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:07.327] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:53:07.328] [info] Wrote 52 bytes to TUN device
+[2025-12-21 18:53:07.371] [info] Read 52 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:08.285] [info] Read 60 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+[2025-12-21 18:53:08.288] [info] Message arrived with topic: mqtt_tunnel/commands/tunnel-client-b/A
+[2025-12-21 18:53:08.288] [info] Wrote 40 bytes to TUN device
+[2025-12-21 18:53:39.361] [info] Read 48 bytes from TUN and published to topic mqtt_tunnel/commands/tunnel-client-b/B
+```
+
+### A2: TCP-Listener mit netcat (mqtt-vm-a)
+```bash
+Last login: Sun Dec 21 18:32:46 2025 from 192.168.56.1
+usera@mqtt-vm-a:~$ nc -l -p 12345
+TESTNACHRICHT
+usera@mqtt-vm-a:~$
+````
+
+### B2: TCP-Client mit netcat (mqtt-vm-b)
+```bash
+userb@mqtt-vm-b:~$ printf '%s\n' 'TESTNACHRICHT' | nc 10.0.0.1 12345
+```
+
+### A3: tcpdump auf dem Host-Only-Interface – ohne MQTT (mqtt-vm-a, Interface: enp0s8, Filter: not port 1883)
+```bash
+usera@mqtt-vm-a:~$ sudo tcpdump -i enp0s8 -n -c 20 not port 1883
+[sudo] password for usera:
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp0s8, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+18:51:41.387920 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 867930085:867930213, ack 1185651439, win 501, length 128
+18:51:41.388447 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 128:192, ack 1, win 501, length 64
+18:51:41.388698 IP 192.168.56.1.58422 > 192.168.56.101.22: Flags [.], ack 192, win 1021, length 0
+18:51:41.388854 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 192:272, ack 1, win 501, length 80
+18:51:41.389135 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 272:352, ack 1, win 501, length 80
+18:51:41.389262 IP 192.168.56.1.58422 > 192.168.56.101.22: Flags [.], ack 352, win 1026, length 0
+18:51:41.389374 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 352:432, ack 1, win 501, length 80
+18:51:41.389588 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 432:496, ack 1, win 501, length 64
+18:51:41.389703 IP 192.168.56.1.58422 > 192.168.56.101.22: Flags [.], ack 496, win 1026, length 0
+18:51:41.480228 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 496:688, ack 1, win 501, length 192
+18:51:41.480415 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 688:752, ack 1, win 501, length 64
+18:51:41.480466 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 752:912, ack 1, win 501, length 160
+18:51:41.480529 IP 192.168.56.1.58422 > 192.168.56.101.22: Flags [.], ack 752, win 1025, length 0
+18:51:41.480607 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 912:976, ack 1, win 501, length 64
+18:51:41.480781 IP 192.168.56.1.58422 > 192.168.56.101.22: Flags [.], ack 976, win 1024, length 0
+18:51:41.480898 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 976:1136, ack 1, win 501, length 160
+18:51:41.481116 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 1136:1200, ack 1, win 501, length 64
+18:51:41.481235 IP 192.168.56.1.58422 > 192.168.56.101.22: Flags [.], ack 1200, win 1023, length 0
+18:51:41.481375 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 1200:1360, ack 1, win 501, length 160
+18:51:41.481570 IP 192.168.56.101.22 > 192.168.56.1.58422: Flags [P.], seq 1360:1424, ack 1, win 501, length 64
+20 packets captured
+68 packets received by filter
+0 packets dropped by kernel
+```
+
+### A4: tcpdump auf dem MQTT-Port (mqtt-vm-a, Interface: enp0s8, Filter: port 1883)
+```bash
+usera@mqtt-vm-a:~$ sudo tcpdump -i enp0s8 -n -c 20 port 1883
+[sudo] password for usera:
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp0s8, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+18:53:07.316862 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [P.], seq 214377213:214377309, ack 145860215, win 502, options [nop,nop,TS val 644244866 ecr 350208098], length 96
+18:53:07.317034 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [P.], seq 1:5, ack 96, win 509, options [nop,nop,TS val 350253888 ecr 644244866], length 4
+18:53:07.317358 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [.], ack 5, win 502, options [nop,nop,TS val 644244867 ecr 350253888], length 0
+18:53:07.321145 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [P.], seq 5:101, ack 96, win 509, options [nop,nop,TS val 350253892 ecr 644244867], length 96
+18:53:07.321543 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [.], ack 101, win 502, options [nop,nop,TS val 644244871 ecr 350253892], length 0
+18:53:07.323213 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [P.], seq 96:100, ack 101, win 502, options [nop,nop,TS val 644244873 ecr 350253892], length 4
+18:53:07.364090 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [.], ack 100, win 509, options [nop,nop,TS val 350253935 ecr 644244873], length 0
+18:53:07.364467 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [P.], seq 100:196, ack 101, win 502, options [nop,nop,TS val 644244914 ecr 350253935], length 96
+18:53:07.364495 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [.], ack 196, win 509, options [nop,nop,TS val 350253935 ecr 644244914], length 0
+18:53:07.364737 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [P.], seq 101:105, ack 196, win 509, options [nop,nop,TS val 350253935 ecr 644244914], length 4
+18:53:07.406395 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [.], ack 105, win 502, options [nop,nop,TS val 644244956 ecr 350253935], length 0
+18:53:08.279202 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [P.], seq 196:300, ack 105, win 502, options [nop,nop,TS val 644245829 ecr 350253935], length 104
+18:53:08.279413 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [P.], seq 105:109, ack 300, win 509, options [nop,nop,TS val 350254850 ecr 644245829], length 4
+18:53:08.279833 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [.], ack 109, win 502, options [nop,nop,TS val 644245829 ecr 350254850], length 0
+18:53:08.282054 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [P.], seq 109:193, ack 300, win 509, options [nop,nop,TS val 350254853 ecr 644245829], length 84
+18:53:08.282381 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [.], ack 193, win 502, options [nop,nop,TS val 644245832 ecr 350254853], length 0
+18:53:08.283808 IP 192.168.56.102.46974 > 192.168.56.101.1883: Flags [P.], seq 300:304, ack 193, win 502, options [nop,nop,TS val 644245833 ecr 350254853], length 4
+18:53:08.324214 IP 192.168.56.101.1883 > 192.168.56.102.46974: Flags [.], ack 304, win 509, options [nop,nop,TS val 350254895 ecr 644245833], length 0
+18:53:14.890604 IP 192.168.56.102.46970 > 192.168.56.101.1883: Flags [P.], seq 2327694560:2327694562, ack 824296485, win 501, options [nop,nop,TS val 644252440 ecr 350199996], length 2
+18:53:14.890735 IP 192.168.56.101.1883 > 192.168.56.102.46970: Flags [P.], seq 1:3, ack 2, win 506, options [nop,nop,TS val 350261461 ecr 644252440], length 2
+20 packets captured
+21 packets received by filter
+0 packets dropped by kernel
+```
+
+### A6: TCP-Client (nc) (mqtt-vm-b)
+userb@mqtt-vm-b:~$ printf '%s\n' 'TESTNACHRICHT' | nc 10.0.0.1 12345
+(UNKNOWN) [10.0.0.1] 12345 (?) : Connection refused
+userb@mqtt-vm-b:~$
+```
+
+
 
