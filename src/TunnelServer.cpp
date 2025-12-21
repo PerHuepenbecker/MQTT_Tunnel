@@ -36,14 +36,17 @@ void TunnelServer::start_server() {
 
     spdlog::info("Tunnel server started");
 
-    while (*global_run_flag_) {
-        auto& command_channel = mqtt_channels_.get_command_client();
+    auto& command_channel = mqtt_channels_.get_command_client();
+    
+    mqtt::const_message_ptr msg;
 
-        mqtt::const_message_ptr msg = command_channel.consume_message();
+    while (*global_run_flag_) {        
+
+        bool consumed = command_channel.try_consume_message(&msg); // Use non-blocking consume to allow checking run flag
 
         spdlog::info("Consumed message from command channel");
 
-        if (msg) {
+        if (consumed && msg) {
 
             // check if message is a session termination
 
@@ -72,6 +75,8 @@ void TunnelServer::start_server() {
             spdlog::info("Handling client handshake message");
             handle_client_handshake(msg);
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep to reduce CPU usage
     }
 
     spdlog::info("Server shutting down...");
