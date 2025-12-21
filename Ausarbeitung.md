@@ -697,6 +697,7 @@ listening on enp0s8, link-type EN10MB (Ethernet), snapshot length 262144 bytes
 ```
 
 ### A6: TCP-Client (nc) (mqtt-vm-b)
+```bash
 userb@mqtt-vm-b:~$ printf '%s\n' 'TESTNACHRICHT' | nc 10.0.0.1 12345
 (UNKNOWN) [10.0.0.1] 12345 (?) : Connection refused
 userb@mqtt-vm-b:~$
