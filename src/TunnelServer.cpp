@@ -44,9 +44,10 @@ void TunnelServer::start_server() {
 
         bool consumed = command_channel.try_consume_message(&msg); // Use non-blocking consume to allow checking run flag
 
-        spdlog::info("Consumed message from command channel");
-
-        if (consumed && msg) {
+        
+        if (consumed) {
+            
+            spdlog::info("Consumed message from command channel");
 
             // check if message is a session termination
 
@@ -185,7 +186,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         // End of old system call based route setup block
         
         mqtt_channels_.get_data_client().subscribe(session_config.topic_outbound, 1)->wait();
-        active_clients_.add_session(client_hello.client_base_id, session_config);
+        active_clients_.add_session(session_config.client_id, session_config);
         spdlog::info("Session established for client ID: {} with IP: {}", client_hello.client_base_id, assigned_ip);
 
     } catch (const std::exception& e) {
@@ -246,7 +247,7 @@ void TunnelServer::async_tun_read() {
 
         // Lookup session for destination IP
         SessionConfig session;
-        if(!active_clients_.get_session(dest_ip, session)) {
+        if(!active_clients_.get_session_by_ip(dest_ip, session)) {
             spdlog::warn("No active session for destination IP: {}", dest_ip);
             continue; 
         }
