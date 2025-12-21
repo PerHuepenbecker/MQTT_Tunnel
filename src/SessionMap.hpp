@@ -23,6 +23,17 @@ class SessionMap {
             return false;
         }
 
+        bool get_session_by_ip(const std::string& client_ip, SessionConfig& config) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (const auto& pair : sessions_) {
+                if (pair.second.client_address == client_ip) {
+                    config = pair.second;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         void remove_session(const std::string& client_id) {
             std::lock_guard<std::mutex> lock(mutex_);
             sessions_.erase(client_id);
