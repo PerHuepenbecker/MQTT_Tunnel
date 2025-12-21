@@ -48,6 +48,8 @@ target_link_libraries(mqtt_tunnel_tests
     pthread
     OpenSSL::SSL
     OpenSSL::Crypto
+    spdlog::spdlog
+    fmt::fmt
 )
 
 include(GoogleTest)

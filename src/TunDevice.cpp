@@ -6,7 +6,7 @@ TunDevice::TunDevice(const std::string& device_name) {
     struct ifreq ifr;
     int fd, err;
 
-    spdlog::info("Creating TUN device: {}", device_name);
+    spdlog::debug("Creating TUN device: {}", device_name);
 
     if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
         spdlog::error("open(/dev/net/tun) failed: {}", strerror(errno));
@@ -30,7 +30,7 @@ TunDevice::TunDevice(const std::string& device_name) {
         return;
     }
 
-    spdlog::info("TUN device {} created", ifr.ifr_name);
+    spdlog::debug("TUN device {} created", ifr.ifr_name);
 
     tun_fd_ = fd;
 }
@@ -41,5 +41,5 @@ TunDevice::~TunDevice(){
     if(tun_fd_ >= 0){
         close(tun_fd_);
     }
-    spdlog::info("TUN device closed");
+    spdlog::debug("TUN device closed");
 }

@@ -1,11 +1,12 @@
 #include "TunnelServer.hpp"
 
 
-TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size)
+TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size, std::atomic<bool>* run_flag)
     : mqtt_channels_(broker_address, command_channel_name),
       tun_device_(tun_device_name),
       ip_pool_(ip_pool_base, ip_pool_size),
-      command_channel_name_(command_channel_name) {};
+      command_channel_name_(command_channel_name),
+      global_run_flag_(run_flag) {}
 
 void TunnelServer::start_server() {
 
@@ -29,30 +30,62 @@ void TunnelServer::start_server() {
     connect_command_channel();
     connect_data_channel();
     mqtt_channels_.set_tun_callback(tun_device_.fd());
-    server_running_ = true;
 
     tunnel_active_ = true; // setting the atomic flag for async coordination
     tun_read_async_thread_ = std::thread(&TunnelServer::async_tun_read, this); // start async TUN read thread 
 
     spdlog::info("Tunnel server started");
 
-    while (server_running_) {
-        auto& command_channel = mqtt_channels_.get_command_client();
+    auto& command_channel = mqtt_channels_.get_command_client();
+    
+    mqtt::const_message_ptr msg;
 
-        mqtt::const_message_ptr msg = command_channel.consume_message();
+    while (*global_run_flag_) {        
 
-        spdlog::info("Consumed message from command channel");
+        bool consumed = command_channel.try_consume_message(&msg); // Use non-blocking consume to allow checking run flag
 
-        if (msg) {
+        
+        if (consumed) {
+            
+            spdlog::info("Consumed message from command channel");
+
+            // check if message is a session termination
+
+            if (msg->get_payload().find("SESSION_TERMINATION") != std::string::npos) {
+
+                spdlog::info("Received session termination message");
+                SessionTermination term_msg = SessionTermination::from_string(msg->get_payload());
+
+                SessionConfig dummy_config;
+
+                if (active_clients_.get_session(term_msg.client_id, dummy_config)) {
+                    spdlog::info("Terminating session for client ID: {}", term_msg.client_id);
+                } else {
+                    spdlog::warn("No active session found for client ID: {}", term_msg.client_id);
+                    continue;
+                }
+
+                active_clients_.remove_session(term_msg.client_id);
+                ip_pool_.release_ip(dummy_config.client_address);
+                spdlog::info("Terminated session for client ID: {}", term_msg.client_id);
+                
+                continue;
+
+            }
+
             spdlog::info("Handling client handshake message");
             handle_client_handshake(msg);
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep to reduce CPU usage
     }
+
+    spdlog::info("Server shutting down...");
+    stop_server();
 }
 
 
 void TunnelServer::stop_server() {
-    server_running_ = false;
     tunnel_active_ = false;
 
     if (tun_read_async_thread_.joinable()) {
@@ -153,7 +186,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         // End of old system call based route setup block
         
         mqtt_channels_.get_data_client().subscribe(session_config.topic_outbound, 1)->wait();
-        active_clients_.add_session(assigned_ip, session_config);
+        active_clients_.add_session(session_config.client_id, session_config);
         spdlog::info("Session established for client ID: {} with IP: {}", client_hello.client_base_id, assigned_ip);
 
     } catch (const std::exception& e) {
@@ -214,7 +247,7 @@ void TunnelServer::async_tun_read() {
 
         // Lookup session for destination IP
         SessionConfig session;
-        if(!active_clients_.get_session(dest_ip, session)) {
+        if(!active_clients_.get_session_by_ip(dest_ip, session)) {
             spdlog::warn("No active session for destination IP: {}", dest_ip);
             continue; 
         }

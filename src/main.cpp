@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
     std::string broker_address;
     std::string client_id;
     std::string command_channel_name = "mqtt_tunnel/commands";
+    bool verbose = false;
     
     Mode mode = MODE_CLIENT;
 
@@ -35,12 +36,18 @@ int main(int argc, char** argv) {
     app.add_option("-b,--broker", broker_address, "MQTT Broker Address")->required();
     app.add_option("-c,--client-id", client_id, "Client ID for MQTT connection")->required();
     app.add_option("-C,--command-channel", command_channel_name, "MQTT Command Channel Name");
+    app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
     
     CLI11_PARSE(app, argc, argv);
 
     std::signal(SIGINT, signal_handler);
 
-  
+    if (verbose) {
+        spdlog::set_level(spdlog::level::debug);
+        spdlog::debug("Verbose logging enabled");
+    } else {
+        spdlog::set_level(spdlog::level::info);
+    }
 
     try {
         if (mode == MODE_CLIENT) {
@@ -61,7 +68,8 @@ int main(int argc, char** argv) {
         else if (mode == MODE_SERVER) {
             TunnelServerBuilder builder;
             builder.set_broker_address(broker_address)
-                   .set_command_channel_name(command_channel_name);
+                   .set_command_channel_name(command_channel_name)
+                   .set_global_run_flag(&run);
             auto server = builder.build();
             server->start_server();
             

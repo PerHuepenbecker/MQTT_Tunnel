@@ -20,4 +20,31 @@ Educational Project - Implementation of a MQTT-Network tunnel
 5. run cmake ..
 6. run make
 
+# Usage
+
+### Execution Syntax
+```bash
+sudo ./mqtt_tunnel [ARGUMENTS]
+```
+
+Arguments are:
+
+| Argument          | Type  | Flag                     | Required | Description                                                      |
+|-------------------|-------|--------------------------|----------|------------------------------------------------------------------|
+| Mode              | `<str>` | `-m, --mode`             | Yes      | Defines the tunnel operation mode (client, server).            |
+| Broker            | `<url>` | `-b, --broker`           | Yes      | The MQTT broker URI (e.g., `tcp://localhost:8883`).            |
+| Client ID         | `<str>` | `-i, --client-id`        | Yes      | Identifier                                                     |
+| Command Channel   | `<str>` | `-c, --command-channel`  | Yes      | The MQTT topic used for tunnel setuo                           |
+
+
+You need to run the compiled application with elevated privileges. 
+
+Example: 
+
+```bash
+    ./mqtt_tunnel -m server -b tcp://192.168.0.2:1883 -c tunnelServer -C tunnelServerCommand
+```
+
+This will setup a server / gateway.
+
 
