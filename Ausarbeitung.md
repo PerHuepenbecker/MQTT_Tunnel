@@ -227,8 +227,6 @@ Wie bereits im Vorfeld erwähnt, bietet MQTT keinen eigenen Mechanismus zur Fort
 
 ## 3.1 Zielsetzung
 
-## 3.1 Zielsetzung
-
 Ziel dieses Projekts ist die Entwicklung und Analyse eines Netzwerktunnels, der TCP-basierte Kommunikation über ein Message-Broker-basiertes Protokoll transportiert. Als Trägerprotokoll wird MQTT eingesetzt.
 
 Der Tunnel soll es ermöglichen, TCP-Verbindungen transparent über MQTT zu kapseln, sodass für einen externen Beobachter ausschließlich MQTT-Kommunikation zwischen Client und Broker sichtbar ist. Die eigentlichen TCP-Verbindungen sollen dabei auf Netzwerkebene verborgen bleiben.
@@ -238,20 +236,12 @@ Der Schwerpunkt der Arbeit liegt auf der technischen Umsetzung des Tunnels, den 
 
 ## 3.2 Architekturübersicht
 
-Bedingt durch die Entwicklung einer eigenen Anwendung zum Tunneln von Daten via MQTT bietet sich der Einsatz einer TUN-Device an. Ein TUN-Gerät ist eine spezifische Art von virtuellem Netzwerkgerät im Linux-Kernel, das zur Implementierung von Netzwerk-Tunneln verwendet wird, insbesondere für VPN-Dienste (Virtual Private Network).
-Es arbeitet auf der Netzwerkschicht (Schicht 3) und verarbeitet IP-Pakete. [19].
-
-Bei einem TUN-Device handelt es sich um eine virtuelle Netzwerkschnittstelle und kann vereinfacht als Punkt-zu-Punkt- oder Ethernet-Gerät betrachtet werden. Die Besonderheit liegt darin, dass anstelle einer Datenübertragung per physischen Medium, die Datenverbindung virtuell über eine eigene Anwendung aufgebaut wird. [19]
-
-Der Kernel behandelt die Datenpakete der TUN-Device genauso, als würden diese von einem echten physischen Gerät abstammen. Die TUN-Device übernimmt dabei sämtliche Netzwerkrelevanten Aufgaben wie z.B. auch die Segmentierung des ankommenden Datenstroms. Aus diesem Grund kann an dieser Stelle auf weitere Details zu diesem Thema verzichtet werden.
+Der Kernel behandelt die Datenpakete der TUN-Device genauso, als würden diese von einem echten physischen Gerät abstammen. Sämtliche netzwerkrelevanten Funktionen wie Routing, Fragmentierung oder die Verarbeitung von TCP- und UDP-Daten erfolgen dabei im regulären Netzwerk-Stack des Betriebssystems. Die TUN-Device selbst dient ausschließlich als virtuelle Ein- und Ausgabeschnittstelle für IP-Pakete, welche von der Tunnelanwendung verarbeitet werden. Aus diesem Grund kann an dieser Stelle auf weitere Details zu diesem Thema verzichtet werden.
 
 
 ## 3.3 Kommunikationsmodell
 
-Für die bidirektionale Kommunikation zwischen Tunnel-Client und Tunnel-Server werden bewusst **zwei getrennte MQTT-Topics** verwendet:
-
-- `tunnel/client_to_server`
-- `tunnel/server_to_client`
+Für die bidirektionale Kommunikation zwischen Tunnel-Client und Tunnel-Server werden bewusst getrennte MQTT-Topics für Steuer- und Nutzdaten verwendet.
 
 Diese Entscheidung wurde aus folgenden Gründen getroffen:
 
@@ -263,17 +253,47 @@ Diese Entscheidung wurde aus folgenden Gründen getroffen:
 
 Durch diese klare Trennung der Datenrichtungen wird ein stabiler und vorhersagbarer Tunnelbetrieb gewährleistet.
 
+In der implementierten Testumgebung erfolgt der initiale Sitzungsaufbau über einen zentralen Command-Channel. Nach erfolgreichem Handshake werden sitzungsspezifische Topics verwendet, die anhand der Client-ID eindeutig zugeordnet sind. Für jede Sitzung existieren dabei zwei separate Topics, welche die jeweilige Kommunikationsrichtung zwischen Client und Server abbilden.
+
 ## 3.4 Protokolldefinition und Datenformat
+
+Der Tunnel kapselt Netzwerkverkehr, indem er die über das TUN-Interface anfallenden IP-Pakete (Layer 3) als Nutzlast in MQTT-Nachrichten überträgt. Dadurch wird aus Sicht der Anwendungen eine normale IP-Verbindung bereitgestellt, während der Transport zwischen den Tunnelendpunkten über den MQTT-Broker erfolgt.
+
+Die Kommunikation ist logisch in zwei Phasen aufgeteilt:
+
+Handshake / Sitzungsaufbau (Command-Channel)
+Zu Beginn wird eine Sitzung zwischen Client und Server aufgebaut. Dabei werden Parameter wie Client-ID, die zu verwendenden Topics sowie die Tunnel-IP-Konfiguration abgestimmt. Der Server verwaltet anschließend eine Zuordnung „Client-ID ↔ Tunnel-IP“ und akzeptiert Datenpakete nur für aktive Sitzungen.
+
+Datentransfer (Data-Channel)
+Nach erfolgreichem Handshake werden die rohen IP-Pakete als Payload über MQTT ausgetauscht. In der implementierten Testumgebung erfolgt dies über sitzungsspezifische Topics, z. B.:
+
+mqtt_tunnel/commands/<client-id>/A (Richtung Server → Client)
+
+mqtt_tunnel/commands/<client-id>/B (Richtung Client → Server)
+
+Das Datenformat der Payload ist dabei bewusst schlank gehalten: Es werden keine zusätzlichen Protokollheader wie Sequenznummern oder Checksummen auf Anwendungsebene eingeführt. Die Integrität und Reihenfolge werden in der Praxis primär durch die darunterliegenden Protokollmechanismen (TCP-Verkehr innerhalb der IP-Pakete sowie MQTT-Transport) beeinflusst.
 
 ## 3.5 Einsatz eines TUN-Devices
 
+Für die Tunnelumsetzung wird auf beiden Endpunkten ein TUN-Device verwendet. Ein TUN-Device stellt eine virtuelle Netzwerkschnittstelle auf Layer 3 bereit und liefert bzw. akzeptiert komplette IP-Pakete. Für den Linux-Kernel wirkt diese Schnittstelle wie ein normales Netzwerkinterface: Pakete können über Routing-Regeln an das TUN-Interface gesendet werden und erscheinen dort zur Verarbeitung durch die Tunnelanwendung.
+
+Der Ablauf ist dabei grundsätzlich:
+
+Ausgehender Verkehr:
+Ein Programm (z. B. nc/SSH) erzeugt TCP-Verkehr, der vom System als IP-Pakete geroutet wird. Statt über eine physische Netzwerkkarte werden diese Pakete über das konfigurierte Routing an tun0 übergeben. Die Tunnelanwendung liest die Pakete aus tun0 und sendet sie als MQTT-Payload an den Broker.
+
+Eingehender Verkehr:
+Die Tunnelanwendung empfängt MQTT-Nachrichten, entnimmt die Payload (IP-Paket) und schreibt diese in tun0. Der Kernel verarbeitet die Pakete anschließend wie regulären Netzwerkverkehr, sodass die lokale Anwendung die Antworten transparent erhält.
+
+Der Einsatz eines TUN-Devices ermöglicht es, beliebigen IP-basierten Verkehr durch den Tunnel zu leiten, ohne dass Anwendungen speziell angepasst werden müssen. Gleichzeitig wird vermieden, Ethernet-Frames (Layer 2) nachbilden zu müssen, was die Implementierung deutlich vereinfacht.
+
 ## 3.6 Sicherheitsbetrachtung
 
-Bei dem Protokoll MQTT liegt das Hauptaugenmerk auf eine ressourcenschonende Option zum Informationsaustausch zwischen einzelnen IoT-Geräten. Selbst auf der offiziellen Homepage von MQTT wird das Thema Sicherheit sehr vorsichtig formuliert.
+Bei dem Protokoll MQTT liegt das Hauptaugenmerk auf eine ressourcenschonende Option zum Informationsaustausch zwischen einzelnen IoT-Geräten. Selbst auf der offiziellen Webseite von MQTT wird das Thema Sicherheit sehr vorsichtig formuliert.
 
 You can pass a user name and password with an MQTT packet in V3.1 of the protocol. Encryption across the network can be handled with SSL, independently of the MQTT protocol itself (it is worth noting that SSL is not the lightest of protocols, and does add significant network overhead). Additional security can be added by an application encrypting data that it sends and receives, but this is not something built-in to the protocol, in order to keep it simple and lightweight. [Originaler Auszug https://mqtt.org/faq/ unter dem Punkt "Does MQTT support security?" 08.12.2025]
 
-Es wird prinzipiell die Möglichkeit zur Einbindung einer SSL-Verschlüsslung ermöglicht, jedoch muss diese vom Nutzer erst aktiviert werden. Zeitgleich wird darauf hingewiesen, dass der Einsatz dieser Verschlüsselung entgegen des Hauptvorteils von MQTT wirkt und somit der Einsatz mit bedacht gewählt werden soll.
+Es wird prinzipiell die Möglichkeit zur Einbindung einer SSL-/TLS-Verschlüsslung ermöglicht, jedoch muss diese vom Nutzer erst aktiviert werden. Zeitgleich wird darauf hingewiesen, dass der Einsatz dieser Verschlüsselung entgegen des Hauptvorteils von MQTT wirkt und somit der Einsatz mit bedacht gewählt werden soll.
 
 ---
 
@@ -360,6 +380,49 @@ make -j$(nproc)
 # 5. Tests und Analyse
 
 ## 5.1 Funktionale Tests
+
+Zur Überprüfung der grundlegenden Funktionsfähigkeit des MQTT-Tunnels wurden mehrere funktionale Tests durchgeführt. Ziel dieser Tests war es, nachzuweisen, dass TCP-basierte Kommunikation erfolgreich über den MQTT-basierten Tunnel übertragen werden kann und für die beteiligten Anwendungen transparent funktioniert.
+
+### Aufbau des Testszenarios
+
+Der Tunnel-Server wurde auf der virtuellen Maschine **mqtt-vm-a** gestartet, der Tunnel-Client auf **mqtt-vm-b**. Nach erfolgreichem Verbindungsaufbau waren auf beiden Systemen jeweils ein TUN-Interface (`tun0`) mit folgenden IP-Adressen aktiv:
+
+- Tunnel-Server (mqtt-vm-a): `10.0.0.1/24`
+- Tunnel-Client (mqtt-vm-b): `10.0.0.2/24`
+
+Die Verbindung wurde zuvor über den MQTT-Broker erfolgreich etabliert, einschließlich des vollständigen Handshakes zwischen Client und Server.
+
+### Test 1: Erreichbarkeit über den Tunnel (Ping)
+
+Als erster Funktionstest wurde die grundlegende Erreichbarkeit über den Tunnel überprüft. Dazu wurde vom Tunnel-Client ein ICMP-Ping an die Tunnel-IP des Servers gesendet:
+
+```bash
+ping 10.0.0.1
+```
+Die ICMP-Pakete wurden erfolgreich übertragen und beantwortet, was bestätigt, dass IP-Verkehr korrekt über das TUN-Interface gelesen, über MQTT transportiert und auf der Gegenseite wieder in das Netzwerk eingespeist wurde.
+
+### Test 2: TCP-Kommunikation über den Tunnel
+
+Im nächsten Schritt wurde überprüft, ob auch TCP-basierte Kommunikation zuverlässig über den Tunnel funktioniert.
+
+Auf dem Tunnel-Server wurde ein einfacher TCP-Listener mit `netcat` gestartet:
+
+```bash
+nc -l -p 12345
+````
+Anschließend wurde vom Tunnel-Client aus eine TCP-Verbindung über die Tunnel-IP aufgebaut und eine Testnachricht gesendet:
+
+```bash
+printf '%s\n' 'TESTNACHRICHT' | nc 10.0.0.1 12345
+```
+Die Testnachricht wurde auf der Serverseite korrekt empfangen und angezeigt. Damit konnte nachgewiesen werden, dass TCP-Verbindungen vollständig über den MQTT-Tunnel übertragen werden können, ohne dass die beteiligten Anwendungen angepasst werden müssen.
+
+### Ergebnis der funktionalen Tests
+
+Die durchgeführten Tests zeigen, dass der implementierte MQTT-Tunnel in der Lage ist, sowohl ICMP- als auch TCP-Verkehr zuverlässig zu transportieren. Für die Anwendungen erscheint die Verbindung wie eine normale IP-basierte Punkt-zu-Punkt-Verbindung, während der eigentliche Datentransport vollständig über MQTT erfolgt.
+
+Damit ist die grundlegende Funktionalität des Tunnels nachgewiesen.
+
 
 ## 5.2 Performance und Latenz
 
