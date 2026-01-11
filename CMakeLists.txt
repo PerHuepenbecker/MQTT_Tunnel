@@ -25,6 +25,8 @@ add_executable(mqtt_tunnel
     src/TunnelClient.cpp
     src/TunnelServer.cpp
     src/ip_pool.cpp
+    src/CryptoManager.cpp
+    src/TunCallback.cpp
 )
 
 target_link_libraries(mqtt_tunnel 
