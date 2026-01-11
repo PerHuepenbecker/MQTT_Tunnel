@@ -30,6 +30,19 @@ TunDevice::TunDevice(const std::string& device_name) {
         return;
     }
 
+    // Set non-blocking mode to address bad termination behavior due to blocking reads
+
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        spdlog::error("fcntl(F_GETFL) failed: {}", strerror(errno));
+    } else {
+        if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+            spdlog::error("fcntl(F_SETFL) failed: {}", strerror(errno));
+        } else {
+            spdlog::debug("TUN device set to non-blocking mode");
+        }
+    }
+
     spdlog::debug("TUN device {} created", ifr.ifr_name);
 
     tun_fd_ = fd;

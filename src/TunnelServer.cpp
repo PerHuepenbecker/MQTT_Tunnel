@@ -263,11 +263,14 @@ void TunnelServer::async_tun_read() {
         ssize_t read_bytes = read(tun_device_.fd(), buffer.data(), buffer.size());
 
         if(read_bytes < 0) {
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            if (errno == EAGAIN && errno == EWOULDBLOCK) {
+                // if no data available, sleep and continue the loop
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            } else {
                 spdlog::error("Error reading from TUN device: {}", strerror(errno));
+                continue;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            continue;
         }
 
         struct iphdr* ip_header = reinterpret_cast<struct iphdr*>(buffer.data());
