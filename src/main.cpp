@@ -3,6 +3,8 @@
 #include "TunnelServer.hpp"
 #include "../third_party/CLI11.hpp"
 #include <csignal>
+#include <sodium.h>
+
 
 enum Mode {
     MODE_CLIENT,
@@ -28,6 +30,7 @@ int main(int argc, char** argv) {
     std::string client_id;
     std::string command_channel_name = "mqtt_tunnel/commands";
     bool verbose = false;
+    bool disable_encryption = false;
     
     Mode mode = MODE_CLIENT;
 
@@ -37,7 +40,8 @@ int main(int argc, char** argv) {
     app.add_option("-c,--client-id", client_id, "Client ID for MQTT connection")->required();
     app.add_option("-C,--command-channel", command_channel_name, "MQTT Command Channel Name");
     app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
-    
+    app.add_flag("-d,--disable-encryption", disable_encryption, "Disable encryption (not recommended)");
+
     CLI11_PARSE(app, argc, argv);
 
     std::signal(SIGINT, signal_handler);
@@ -54,7 +58,9 @@ int main(int argc, char** argv) {
             TunnelClientBuilder builder;
             builder.set_broker_address(broker_address)
                    .set_client_base_id(client_id)
-                   .set_command_channel_name(command_channel_name);
+                   .set_command_channel_name(command_channel_name)
+                   .set_enable_encryption(!disable_encryption);
+
             auto client = builder.build();
             client->start_tunnel();
             
@@ -69,7 +75,8 @@ int main(int argc, char** argv) {
             TunnelServerBuilder builder;
             builder.set_broker_address(broker_address)
                    .set_command_channel_name(command_channel_name)
-                   .set_global_run_flag(&run);
+                   .set_global_run_flag(&run)
+                   .set_enable_encryption(!disable_encryption);
             auto server = builder.build();
             server->start_server();
             
