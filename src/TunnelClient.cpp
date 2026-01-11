@@ -157,9 +157,6 @@ void TunnelClient::setup_session() {
     }
 
     std::string ack_response_payload = ack_response->get_payload();
-    if(encryption_enabled){
-        ack_response_payload = crypto_manager_.decrypt_data(std::vector<unsigned char>(ack_response_payload.begin(), ack_response_payload.end()), client_base_id_);
-    }
 
     ServerACK server_ack = ServerACK::from_string(ack_response_payload);
     if (server_ack.handshake_identifier != client_hello.handshake_identifier) {
