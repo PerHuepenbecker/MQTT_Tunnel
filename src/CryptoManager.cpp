@@ -69,10 +69,19 @@ std::string CryptoManager::decrypt_data(
     std::string& client_id) 
     {
 
+        spdlog::debug("Decrypting data for client ID: {}", client_id);
+
         auto it = session_map_.find(client_id);
         if (it == session_map_.end()) {
             throw std::runtime_error("Session not found for client ID: " + client_id);
         }  
+
+        // Debugging output for session keys- Dangerous
+        spdlog::debug("Found session for client ID: {}", client_id);
+        spdlog::debug("key rx: ");
+        for (size_t i = 0; i < crypto_kx_SESSIONKEYBYTES; ++i) {
+            spdlog::debug("{:02x}", it->second.rx[i]);
+        }
 
         const CryptoSessionConfig& session = it->second;
 
@@ -182,6 +191,9 @@ ServerHelloCrypto CryptoManager::establish_server_session(ClientHelloCrypto& cli
     memcpy(server_hello_crypto.signature_message, crypto_session.signature_message, crypto_sign_BYTES);
 
     sodium_memzero(server_ephemeral.secret_key, sizeof(server_ephemeral.secret_key));
+
+    spdlog::debug("Established server session for client ID: {}", client_hello_crypto.client_base_id);
+    spdlog::debug("Session Unique Identifier: {}", server_hello_crypto.unique_identifier);
 
     session_map_.emplace(server_hello_crypto.unique_identifier, crypto_session);
     
