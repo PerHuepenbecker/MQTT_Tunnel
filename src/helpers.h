@@ -29,3 +29,16 @@ inline std::string ip_to_string(uint32_t ip_addr) {
     inet_ntop(AF_INET, &ip_addr, ip_str, INET_ADDRSTRLEN);
     return std::string(ip_str);
 }
+
+
+
+inline std::string extract_client_id_from_topic(const std::string& topic) {
+    
+    size_t first_slash = topic.find('/');
+    size_t second_slash = topic.find('/', first_slash + 1);
+    
+    if (first_slash != std::string::npos && second_slash != std::string::npos) {
+        return topic.substr(first_slash + 1, second_slash - first_slash - 1);
+    }
+    return ""; 
+}
