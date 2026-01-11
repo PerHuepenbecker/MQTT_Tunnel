@@ -12,6 +12,8 @@ find_package(PahoMqttCpp REQUIRED)
 find_package(cereal CONFIG REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBSODIUM REQUIRED IMPORTED_TARGET libsodium)
 
 include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${OPENSSL_INCLUDE_DIR})
@@ -32,7 +34,8 @@ target_link_libraries(mqtt_tunnel
     OpenSSL::Crypto
     spdlog::spdlog
     fmt::fmt
-)
+    PkgConfig::LIBSODIUM
+    )
 
 
 add_executable(mqtt_tunnel_tests
