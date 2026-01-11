@@ -223,8 +223,13 @@ void TunnelClient::async_tun_read() {
         while (tunnel_active_) {
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
             if (bytes_read < 0) {
+                if(errno == EAGAIN || errno == EWOULDBLOCK) {
+                
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    continue;
+                }
+
                 spdlog::error("Error reading from TUN device: {}", strerror(errno));
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
             
