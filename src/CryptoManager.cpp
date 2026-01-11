@@ -20,7 +20,7 @@ CryptoManager::CryptoManager(CryptoManager::Role role, bool enable_encryption, b
             std::stringstream ss;
             ss << "Server Public Key (hex): ";
             for (size_t i = 0; i < crypto_sign_PUBLICKEYBYTES; ++i) {
-                ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(server_identity_.private_key_id[i]);
+                ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(server_identity_.public_key_id[i]);
             }
             spdlog::info(ss.str());
             
@@ -87,21 +87,6 @@ std::string CryptoManager::decrypt_data(
     return std::string(plaintext.begin(), plaintext.end());
 }
 
-// Necessary struct for ephemeral and server identification x25519 keypair
-struct X25519KeyPair {
-    uint8_t public_key[crypto_kx_PUBLICKEYBYTES];
-    uint8_t secret_key[crypto_kx_SECRETKEYBYTES];
-};
-
-
-struct CryptoSessionConfig {
-    uint8_t rx[crypto_kx_SESSIONKEYBYTES];
-    uint8_t tx[crypto_kx_SESSIONKEYBYTES];
-    uint8_t nonce[crypto_secretbox_NONCEBYTES];
-    uint8_t signature_message[crypto_sign_BYTES*2];
-
-};
-
 // Function to generate a ephemeral x25519 keypair for key exchange
 
 CryptoManager::X25519KeyPair CryptoManager::generate_x25519_keypair() {
@@ -116,97 +101,155 @@ CryptoManager::X25519KeyPair CryptoManager::generate_x25519_keypair() {
 // Function to generate a static server identity keypair for identification to prevent MITM
 // Current approach uses public key pinning as a simple method of server identification
 
-CryptoManager::ServerIdentity CryptoManager::generate_static_server_identity(){
+CryptoManager::ServerIdentity CryptoManager::generate_static_server_identity() {
+    CryptoManager::ServerIdentity id{};
 
-    CryptoManager::ServerIdentity server_identity;
-
-    uint8_t server_id_public_key[crypto_kx_PUBLICKEYBYTES];
-    uint8_t server_id_secret_key[crypto_kx_SECRETKEYBYTES];
-
-    crypto_sign_keypair(server_identity.private_key_id, server_identity.secret_key_id);
-    return server_identity;
-}
-
-// load from local files
-
-CryptoManager::ServerIdentity CryptoManager::load_local_server_identity() {
-    CryptoManager::ServerIdentity id;
-
-    bool valid = true;
-
-    FILE* f = fopen("ServerID.key", "rb");
-    if (!f) valid = false;
-    fread(id.secret_key_id, 1, crypto_sign_SECRETKEYBYTES, f);
-    fclose(f);
-
-    f = fopen("ServerID.pub", "rb");
-    if (!f) valid = false;
-    fread(id.private_key_id, 1, crypto_sign_PUBLICKEYBYTES, f);
-    fclose(f);
-
-    if (!valid) {
-        spdlog::error("Failed to load server identity keys from files");
-        throw std::runtime_error("Failed to load server identity keys from files");
+    if (crypto_sign_keypair(id.public_key_id, id.secret_key_id) != 0) {
+        throw std::runtime_error("Failed to generate static server identity (Ed25519)");
     }
 
     return id;
-
 }
 
-CryptoManager::CryptoSessionConfig CryptoManager::establish_server_session(){
-    CryptoSessionConfig crypto_session;
+
+
+// load from local files
+
+#include <fstream>
+
+CryptoManager::ServerIdentity CryptoManager::load_local_server_identity() {
+    ServerIdentity id{};
+    {
+        std::ifstream sk("ServerID.key", std::ios::binary);
+        if (!sk)
+            throw std::runtime_error("ServerID.key missing");
+        sk.read(reinterpret_cast<char*>(id.secret_key_id),
+                crypto_sign_SECRETKEYBYTES);
+        if (sk.gcount() != crypto_sign_SECRETKEYBYTES)
+            throw std::runtime_error("ServerID.key has wrong size");
+    }
+
+    {
+        std::ifstream pk("ServerID.pub", std::ios::binary);
+        if (!pk)
+            throw std::runtime_error("ServerID.pub missing");
+        pk.read(reinterpret_cast<char*>(id.public_key_id),
+                crypto_sign_PUBLICKEYBYTES);
+        if (pk.gcount() != crypto_sign_PUBLICKEYBYTES)
+            throw std::runtime_error("ServerID.pub has wrong size");
+    }
+
+    return id;
+}
+
+CryptoManager::CryptoSessionConfig CryptoManager::establish_server_session(const uint8_t client_public_key[crypto_kx_PUBLICKEYBYTES]){
+
+    CryptoManager::CryptoSessionConfig crypto_session;  
 
     auto server_ephemeral = generate_x25519_keypair();
 
-    uint8_t signed_server_ephemeral_key[crypto_sign_BYTES];
-
-    uint8_t message[crypto_kx_PUBLICKEYBYTES + crypto_kx_SECRETKEYBYTES];
-
-    memcpy(message, server_ephemeral.public_key, 32);
-    memcpy(message + 32, server_ephemeral.secret_key, 32);
-
-    crypto_sign_detached(signed_server_ephemeral_key, nullptr, message, 64, server_identity_.secret_key_id);
-
-    memcpy(crypto_session.signature_message, signed_server_ephemeral_key, crypto_sign_BYTES);
+    if (crypto_sign_detached(
+            crypto_session.signature_message, 
+            nullptr, 
+            server_ephemeral.public_key,      
+            crypto_kx_PUBLICKEYBYTES, 
+            server_identity_.secret_key_id    
+        ) != 0) {
+        throw std::runtime_error("Failed to sign ephemeral key");
+        
+        memcpy(crypto_session.server_ephemeral_public_key, server_ephemeral.public_key, crypto_kx_PUBLICKEYBYTES);
 
     if (crypto_kx_server_session_keys(
-            crypto_session.Client_to_Server,
-            crypto_session.Server_to_Client,
+            crypto_session.rx,   
+            crypto_session.tx,    
             server_ephemeral.public_key,
             server_ephemeral.secret_key,
-            server_identity_.private_key_id
+            client_public_key                  
         ) != 0) {
         throw std::runtime_error("Failed to establish server session keys");
     }
 
-    return crypto_session;
-}
-
-CryptoManager::CryptoSessionConfig CryptoManager::establish_client_session() {
-    CryptoManager::CryptoSessionConfig crypto_session;
-    auto client_ephemeral = generate_x25519_keypair();
+    // Zero out becaus e of security reasons
+    sodium_memzero(server_ephemeral.secret_key, sizeof(server_ephemeral.secret_key));
 
     return crypto_session;
+    }
 }
 
-void CryptoManager::generate_client_hello() {
+ClientHelloCrypto CryptoManager::generate_client_hello(const std::string& client_base_id) {
     client_buffer_ephemeral_ = generate_x25519_keypair();
-
+    ClientHelloCrypto client_hello;
+    client_hello.client_base_id = client_base_id; 
+    memcpy(client_hello.client_ephemeral_public_key, client_buffer_ephemeral_.public_key, crypto_kx_PUBLICKEYBYTES);
+    return client_hello;
 }
+
+
+// Serialize helper functio fr public key to hex string for logging or display
+
+std::string CryptoManager::hex_public_key(const ServerIdentity& id) {
+    std::ostringstream ss;
+    for (size_t i = 0; i < crypto_sign_PUBLICKEYBYTES; ++i) {
+
+        ss << std::hex << std::setw(2) << std::setfill('0')
+           << (int)id.public_key_id[i];
+    }
+    return ss.str();
+}
+
 
 void CryptoManager::store_server_identity(const ServerIdentity& id) {
-    FILE* f = fopen("ServerID.key", "wb");
-    if (!f) {
-        spdlog::error("Failed to open ServerID.key for writing");
-        throw std::runtime_error("Failed to open ServerID.key for writing");
+    
+    {
+        std::ofstream sk("ServerID.key", std::ios::binary | std::ios::trunc);
+        if (!sk)
+            throw std::runtime_error("Failed to open ServerID.key for writing");
+        sk.write(reinterpret_cast<const char*>(id.secret_key_id),
+                 crypto_sign_SECRETKEYBYTES);
+        if (!sk)
+            throw std::runtime_error("Failed to write ServerID.key");
     }
-    fwrite(id.secret_key_id, 1, crypto_sign_SECRETKEYBYTES, f);
-    fclose(f);
-    f = fopen("ServerID.pub", "wb");
-    if (!f) {
-        spdlog::error("Failed to open ServerID.pub for writing");
-        throw std::runtime_error("Failed to open ServerID.pub for writing");
+
+    {
+        std::ofstream pk("ServerID.pub", std::ios::binary | std::ios::trunc);
+        if (!pk)
+            throw std::runtime_error("Failed to open ServerID.pub for writing");
+        pk.write(reinterpret_cast<const char*>(id.public_key_id),
+                 crypto_sign_PUBLICKEYBYTES);
+        if (!pk)
+            throw std::runtime_error("Failed to write ServerID.pub");
     }
-    fwrite(id.private_key_id, 1, crypto_sign_PUBLICKEYBYTES, f);
-    fclose(f);
-} 
+}
+
+CryptoManager::CryptoSessionConfig CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_crypto) {
+
+    if (crypto_sign_verify_detached(
+            server_hello_crypto.signature_message,
+            server_hello_crypto.server_ephemeral_public_key,
+            crypto_kx_PUBLICKEYBYTES,
+            server_identity_.public_key_id
+        ) != 0) {
+        if (!skip_server_identity_verification_) {
+            throw std::runtime_error("Server identity verification failed");
+        } else {
+            spdlog::warn("Server identity verification failed, insecure proceed due to flag");
+        }
+    }
+
+    CryptoManager::CryptoSessionConfig crypto_session;
+
+    if (crypto_kx_client_session_keys(
+            crypto_session.rx,
+            crypto_session.tx,
+            client_buffer_ephemeral_.public_key,
+            client_buffer_ephemeral_.secret_key,
+            server_hello_crypto.server_ephemeral_public_key
+        ) != 0) {
+        throw std::runtime_error("Failed to establish client session keys");
+    }
+
+    // Zero out here aswell because of security reasons
+    sodium_memzero(client_buffer_ephemeral_.secret_key, sizeof(client_buffer_ephemeral_.secret_key));
+
+    return crypto_session;
+}

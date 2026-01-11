@@ -1,3 +1,4 @@
+#pragma once
 
 #include <sodium.h>
 #include <vector>
@@ -8,8 +9,11 @@
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <iomanip>
+#include <fstream>
 
-#pragma once
+#include "messages.h"
+
+
 
 class CryptoManager {
     public:
@@ -19,15 +23,17 @@ class CryptoManager {
     };
 
         struct ServerIdentity {
-        uint8_t private_key_id[crypto_sign_PUBLICKEYBYTES];
+        uint8_t public_key_id[crypto_sign_PUBLICKEYBYTES];
         uint8_t secret_key_id[crypto_sign_SECRETKEYBYTES];
     };
 
         struct CryptoSessionConfig {
-        uint8_t Client_to_Server[crypto_kx_SESSIONKEYBYTES];
-        uint8_t Server_to_Client[crypto_kx_SESSIONKEYBYTES];
+        uint8_t rx[crypto_kx_SESSIONKEYBYTES];
+        uint8_t tx[crypto_kx_SESSIONKEYBYTES];
         uint8_t nonce[crypto_secretbox_NONCEBYTES];
         uint8_t signature_message[crypto_sign_BYTES*2];
+        uint8_t server_ephemeral_public_key[crypto_kx_PUBLICKEYBYTES];
+
         bool role_client; // true if client
     };
 
@@ -44,9 +50,9 @@ class CryptoManager {
         void store_server_identity(const ServerIdentity& id);
         X25519KeyPair generate_x25519_keypair();
         ServerIdentity load_local_server_identity();
-        CryptoSessionConfig establish_server_session();
-        void generate_client_hello();
-        CryptoSessionConfig establish_client_session();
+        CryptoSessionConfig establish_server_session(const uint8_t client_public_key[crypto_kx_PUBLICKEYBYTES]);
+        ClientHelloCrypto generate_client_hello(const std::string& client_base_id);
+        CryptoSessionConfig establish_client_session(ServerHelloCrypto& server_hello_crypto);
 
     private:
         ServerIdentity server_identity_; // Only relevant for server side
@@ -57,6 +63,7 @@ class CryptoManager {
         bool enable_encryption_ = false;
         bool skip_server_identity_verification_ = false;
 
+        std::string hex_public_key(const ServerIdentity& id);
         // Map of session configs by client ID - relevant for server and client side. 
         // Overhead for client side is acceptable for simplicity since only one active session needed. 
 
