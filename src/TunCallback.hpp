@@ -38,3 +38,21 @@ class TunCallback : public virtual mqtt::callback {
         int tun_fd_;
 };
 
+class ServerCommandCallback : public virtual mqtt::callback {
+    public:
+        ServerCommandCallback() {}
+
+        void message_arrived(mqtt::const_message_ptr msg) override {
+            spdlog::debug("Server command message arrived");
+
+            
+
+        }
+
+        void connection_lost(const std::string& cause) override {
+            std::cerr << "Server command connection lost: " << cause << std::endl;
+        }
+
+        void delivery_complete(mqtt::delivery_token_ptr token) override {
+        }
+};
