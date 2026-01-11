@@ -6,14 +6,15 @@
 
 #include "types.hpp"
 
+template <typename T>
 class SessionMap {
     public:
-        void add_session(const std::string& client_id, const SessionConfig& config) {
+        void add_session(const std::string& client_id, const T& config) {
             std::lock_guard<std::mutex> lock(mutex_);
             sessions_[client_id] = config;
         }
 
-        bool get_session(const std::string& client_id, SessionConfig& config) {
+        bool get_session(const std::string& client_id, T& config) {
             std::lock_guard<std::mutex> lock(mutex_);
             auto it = sessions_.find(client_id);
             if (it != sessions_.end()) {
@@ -23,7 +24,7 @@ class SessionMap {
             return false;
         }
 
-        bool get_session_by_ip(const std::string& client_ip, SessionConfig& config) {
+        bool get_session_by_ip(const std::string& client_ip, T& config) {
             std::lock_guard<std::mutex> lock(mutex_);
             for (const auto& pair : sessions_) {
                 if (pair.second.client_address == client_ip) {
@@ -40,6 +41,6 @@ class SessionMap {
         }
 
     private:
-        std::map<std::string, SessionConfig> sessions_;
+        std::map<std::string, T> sessions_;
         std::mutex mutex_;
 };
