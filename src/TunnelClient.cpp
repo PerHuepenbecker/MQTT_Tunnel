@@ -115,6 +115,14 @@ void TunnelClient::setup_session() {
 
     spdlog::debug("Received Server Hello");
 
+    // QUick and dirty session config fix - Refactor later - TODO
+
+    if (!encryption_enabled) {
+    session_config_.client_id = server_hello.assigned_client_id_;}
+     else {
+    session_config_.client_id = client_base_id_; 
+}
+
     session_config_.client_id = server_hello.assigned_client_id_;
     session_config_.client_address = server_hello.assigned_client_ip;
     session_config_.server_address = server_hello.server_address;
