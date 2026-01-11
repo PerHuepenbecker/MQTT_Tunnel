@@ -1,4 +1,5 @@
 #include "CryptoManager.hpp"
+#include <spdlog/fmt/bin_to_hex.h>
 
 
 CryptoManager::CryptoManager(CryptoManager::Role role, bool enable_encryption, bool skip_server_identity_verification) : role_(role), enable_encryption_(enable_encryption), skip_server_identity_verification_(skip_server_identity_verification) {
@@ -195,6 +196,9 @@ ServerHelloCrypto CryptoManager::establish_server_session(ClientHelloCrypto& cli
     spdlog::debug("Established server session for client ID: {}", client_hello_crypto.client_base_id);
     spdlog::debug("Session Unique Identifier: {}", server_hello_crypto.unique_identifier);
 
+    spdlog::critical("SERVER RX KEY: {:spn}", spdlog::to_hex(std::begin(crypto_session.rx), std::end(crypto_session.rx)));
+    spdlog::critical("SERVER TX KEY: {:spn}", spdlog::to_hex(std::begin(crypto_session.tx), std::end(crypto_session.tx)));
+
     session_map_.emplace(server_hello_crypto.unique_identifier, crypto_session);
     
     return server_hello_crypto;
@@ -271,6 +275,9 @@ void CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_cry
         ) != 0) {
         throw std::runtime_error("Failed to establish client session keys");
     }
+
+    spdlog::critical("CLIENT RX KEY: {}", spdlog::to_hex(std::begin(crypto_session.rx), std::begin(crypto_session.rx) + crypto_kx_SESSIONKEYBYTES));
+    spdlog::critical("CLIENT TX KEY: {}", spdlog::to_hex(std::begin(crypto_session.tx), std::begin(crypto_session.tx) + crypto_kx_SESSIONKEYBYTES));
 
     // Zero out here aswell because of security reasons
     sodium_memzero(client_buffer_ephemeral_.secret_key, sizeof(client_buffer_ephemeral_.secret_key));
