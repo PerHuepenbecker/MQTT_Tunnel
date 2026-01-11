@@ -132,7 +132,10 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
             mqtt::message_ptr crypto_hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello_crypto_serialized);
             crypto_hello_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(crypto_hello_msg);
+
+            return;
         }
+        
         spdlog::debug("Processing regular Client Hello...");
 
         ClientHello client_hello = ClientHello::from_string(msg->get_payload());

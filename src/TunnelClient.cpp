@@ -4,13 +4,15 @@ TunnelClient::TunnelClient(const std::string& broker_address,
                              const std::string& command_channel_name,
                              const std::string& client_base_id,
                              const std::string& tun_device_name,
-                            bool enable_encryption)
+                            bool enable_encryption,
+                            bool ignore_server_authentication)
     : mqtt_channels_(broker_address, client_base_id),
       tun_device_(tun_device_name),
       command_channel_name_(command_channel_name),
       client_base_id_(client_base_id),
     encryption_enabled(enable_encryption),
-      crypto_manager_(CryptoManager::ROLE_CLIENT, enable_encryption, false) {}
+    ignore_server_authentication_(ignore_server_authentication),
+      crypto_manager_(CryptoManager::ROLE_CLIENT, enable_encryption, ignore_server_authentication) {}
 
 void TunnelClient::start_tunnel() {
     connect_command_channel();

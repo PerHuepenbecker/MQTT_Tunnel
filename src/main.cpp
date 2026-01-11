@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
     std::string command_channel_name = "mqtt_tunnel/commands";
     bool verbose = false;
     bool encryption = true;
+    bool ignore_server_authentication = false;
     
     Mode mode = MODE_CLIENT;
 
@@ -41,6 +42,7 @@ int main(int argc, char** argv) {
     app.add_option("-C,--command-channel", command_channel_name, "MQTT Command Channel Name");
     app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
     app.add_flag("-e,--encryption", encryption, "Enable encryption (recommended)");
+    app.add_flag("-u,--ignore-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -59,7 +61,8 @@ int main(int argc, char** argv) {
             builder.set_broker_address(broker_address)
                    .set_client_base_id(client_id)
                    .set_command_channel_name(command_channel_name)
-                   .set_enable_encryption(encryption);
+                   .set_enable_encryption(encryption)
+                    .set_ignore_server_authentication(ignore_server_authentication);
 
             auto client = builder.build();
             client->start_tunnel();
