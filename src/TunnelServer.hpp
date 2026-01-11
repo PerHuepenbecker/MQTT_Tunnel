@@ -16,6 +16,7 @@
 #include "messages.h"
 #include <netinet/ip.h>
 #include <chrono>
+#include "CryptoManager.hpp"
 
 class TunnelServer;
 
@@ -103,7 +104,7 @@ class TunnelServer {
         TunDevice tun_device_;               // TUN device wrapper
         IPPool ip_pool_;                     // address pool for client IPs
         std::string command_channel_name_;   // command channel name - preshared information
-        SessionMap active_clients_;          // Threadsafe map of currently active clients with session info
+        SessionMap<SessionConfig> active_clients_;          // Threadsafe map of currently active clients with session info
         std::string own_ip_address_;         // IP address of the server side TUN device
         std::atomic<bool>* global_run_flag_ = nullptr; // pointer to global run flag from main
         
