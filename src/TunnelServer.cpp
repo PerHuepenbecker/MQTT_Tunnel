@@ -129,13 +129,16 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
             spdlog::debug("Processed Client Hello Crypto, sending Server Hello Crypto...");
 
             std::string server_hello_crypto_serialized = server_hello_crypto.to_string();
+
+            spdlog::debug("Server Hello Crypto message: {}", server_hello_crypto_serialized);
+
             mqtt::message_ptr crypto_hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello_crypto_serialized);
             crypto_hello_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(crypto_hello_msg);
 
             return;
         }
-        
+
         spdlog::debug("Processing regular Client Hello...");
 
         ClientHello client_hello = ClientHello::from_string(msg->get_payload());
@@ -145,6 +148,8 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         std::string assigned_ip = ip_pool_.allocate_ip();
         std::string inbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/A";
         std::string outbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/B";
+
+        spdlog::info("Assigned IP: {} Inbound Topic: {} Outbound Topic: {}", assigned_ip, inbound_topic, outbound_topic);
 
         SessionConfig session_config;
         session_config.client_id = client_hello.client_base_id;
