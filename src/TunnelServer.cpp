@@ -308,7 +308,12 @@ void TunnelServer::async_tun_read() {
             payload_to_send.assign(buffer.data(), read_bytes);
         }
     
-        mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_inbound, std::string(buffer.data(), read_bytes));
+        mqtt::message_ptr pubmsg = mqtt::make_message(
+            session.topic_inbound, 
+            payload_to_send.data(), 
+            payload_to_send.size()
+        );
+        
         pubmsg->set_qos(1);
         mqtt_channels_.get_data_client().publish(pubmsg);
     }
