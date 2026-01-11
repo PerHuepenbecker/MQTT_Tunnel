@@ -13,8 +13,6 @@
 
 #include "messages.h"
 
-
-
 class CryptoManager {
     public:
         struct X25519KeyPair {
@@ -43,16 +41,17 @@ class CryptoManager {
     };
 
         CryptoManager(Role role, bool enable_encryption = true, bool skip_server_identity_verification = false);
-        std::string encrypt_data(const std::vector<unsigned char>& plaintext, const std::vector<unsigned char>& key, const std::vector<unsigned char>& nonce);
-        std::string decrypt_data(const std::vector<unsigned char>& ciphertext, const std::vector<unsigned char>& key, const std::vector<unsigned char>& nonce);
+        std::string encrypt_data(const std::vector<unsigned char>& plaintext, std::string& client_id);
+        std::string decrypt_data(const std::vector<unsigned char>& full_packet, std::string& client_id);
 
         ServerIdentity generate_static_server_identity();
         void store_server_identity(const ServerIdentity& id);
         X25519KeyPair generate_x25519_keypair();
         ServerIdentity load_local_server_identity();
-        CryptoSessionConfig establish_server_session(const uint8_t client_public_key[crypto_kx_PUBLICKEYBYTES]);
+        ServerHelloCrypto establish_server_session(ClientHelloCrypto& client_hello_crypto);
         ClientHelloCrypto generate_client_hello(const std::string& client_base_id);
-        CryptoSessionConfig establish_client_session(ServerHelloCrypto& server_hello_crypto);
+        ServerHelloCrypto generate_server_hello();
+        void establish_client_session(ServerHelloCrypto& server_hello_crypto);
 
     private:
         ServerIdentity server_identity_; // Only relevant for server side
@@ -62,11 +61,12 @@ class CryptoManager {
         bool server_identity_set_ = false;
         bool enable_encryption_ = false;
         bool skip_server_identity_verification_ = false;
+        CryptoSessionConfig client_crypto_session_;
 
         std::string hex_public_key(const ServerIdentity& id);
         // Map of session configs by client ID - relevant for server and client side. 
         // Overhead for client side is acceptable for simplicity since only one active session needed. 
 
-        std::unordered_map<std::string, CryptoSessionConfig> session_map_; 
+        std::unordered_map<std::string, CryptoSessionConfig> session_map_;
 };
 

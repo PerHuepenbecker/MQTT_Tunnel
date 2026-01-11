@@ -32,60 +32,68 @@ CryptoManager::CryptoManager(CryptoManager::Role role, bool enable_encryption, b
 
 }
 
-std::string CryptoManager::encrypt_data(
-    const std::vector<unsigned char>& plaintext,
-    const std::vector<unsigned char>& key,
-    const std::vector<unsigned char>& nonce
-) {
-    if (key.size() != crypto_secretbox_KEYBYTES) {
-        throw std::runtime_error("Invalid key size");
-    }
-    if (nonce.size() != crypto_secretbox_NONCEBYTES) {
-        throw std::runtime_error("Invalid nonce size");
-    }
+std::string CryptoManager::encrypt_data(const std::vector<unsigned char>& plaintext, std::string& client_id) {
 
     std::vector<unsigned char> ciphertext(plaintext.size() + crypto_secretbox_MACBYTES);
 
+    auto it = session_map_.find(client_id);
+    if (it == session_map_.end()) {
+        throw std::runtime_error("Session not found for client ID: " + client_id);
+    }
+
+    const CryptoSessionConfig& session = it->second;
+
+    unsigned char nonce[crypto_secretbox_NONCEBYTES];
+    randombytes_buf(nonce, sizeof(nonce));
+
+    std::vector<unsigned char> full_packet(crypto_secretbox_NONCEBYTES + plaintext.size() + crypto_secretbox_MACBYTES);
+    memcpy(full_packet.data(), nonce, crypto_secretbox_NONCEBYTES);
+
     if (crypto_secretbox_easy(
-            ciphertext.data(),
+            full_packet.data() + crypto_secretbox_NONCEBYTES, // So that only the packet data after nonce is encrypted
             plaintext.data(),
             plaintext.size(),
-            nonce.data(),
-            key.data()
+            nonce,
+            session.tx
         ) != 0) {
-
         throw std::runtime_error("Encryption failed");
     }
 
-    return std::string(ciphertext.begin(), ciphertext.end());
+    return std::string(full_packet.begin(), full_packet.end());
 }
 
 // Decrypt data using secretbox_easy API
 
 std::string CryptoManager::decrypt_data(
-    const std::vector<unsigned char>& ciphertext,
-    const std::vector<unsigned char>& key,
-    const std::vector<unsigned char>& nonce
-) {
-    if (key.size() != crypto_secretbox_KEYBYTES) {
-        throw std::runtime_error("Invalid key size");
-    }
+    const std::vector<unsigned char>& full_packet,
+    std::string& client_id) 
+    {
 
-    std::vector<unsigned char> plaintext(ciphertext.size() - crypto_secretbox_MACBYTES);
+        auto it = session_map_.find(client_id);
+        if (it == session_map_.end()) {
+            throw std::runtime_error("Session not found for client ID: " + client_id);
+        }  
 
-    if (crypto_secretbox_open_easy(
+        const CryptoSessionConfig& session = it->second;
+
+        const uint8_t* nonce_pointer = full_packet.data();
+        const uint8_t* ciphertext_pointer = full_packet.data() + crypto_secretbox_NONCEBYTES;
+        size_t ciphertext_len = full_packet.size() - crypto_secretbox_NONCEBYTES;
+
+        std::vector<unsigned char> plaintext(ciphertext_len - crypto_secretbox_MACBYTES);
+        
+        if(crypto_secretbox_open_easy(
             plaintext.data(),
-            ciphertext.data(),
-            ciphertext.size(),
-            nonce.data(),
-            key.data()
+            ciphertext_pointer,
+            ciphertext_len,
+            nonce_pointer,
+            session.rx
         ) != 0) {
+            throw std::runtime_error("Decryption failed");
+        }
 
-        throw std::runtime_error("Decryption failed");
-    }
-
-    return std::string(plaintext.begin(), plaintext.end());
-}
+         return std::string(plaintext.begin(), plaintext.end());
+        }
 
 // Function to generate a ephemeral x25519 keypair for key exchange
 
@@ -142,12 +150,14 @@ CryptoManager::ServerIdentity CryptoManager::load_local_server_identity() {
     return id;
 }
 
-CryptoManager::CryptoSessionConfig CryptoManager::establish_server_session(const uint8_t client_public_key[crypto_kx_PUBLICKEYBYTES]){
-
+ServerHelloCrypto CryptoManager::establish_server_session(ClientHelloCrypto& client_hello_crypto) {
     CryptoManager::CryptoSessionConfig crypto_session;  
+    ServerHelloCrypto server_hello_crypto;
 
     auto server_ephemeral = generate_x25519_keypair();
-
+    // Create unique identifier for this session will be used as areplacement for the client ID in session map
+    server_hello_crypto.unique_identifier = client_hello_crypto.client_base_id+"_"+std::to_string(std::chrono::system_clock::now().time_since_epoch().count()); 
+    
     if (crypto_sign_detached(
             crypto_session.signature_message, 
             nullptr, 
@@ -156,24 +166,26 @@ CryptoManager::CryptoSessionConfig CryptoManager::establish_server_session(const
             server_identity_.secret_key_id    
         ) != 0) {
         throw std::runtime_error("Failed to sign ephemeral key");
-        
-        memcpy(crypto_session.server_ephemeral_public_key, server_ephemeral.public_key, crypto_kx_PUBLICKEYBYTES);
+    } 
 
     if (crypto_kx_server_session_keys(
             crypto_session.rx,   
             crypto_session.tx,    
             server_ephemeral.public_key,
             server_ephemeral.secret_key,
-            client_public_key                  
+            client_hello_crypto.client_ephemeral_public_key                  
         ) != 0) {
         throw std::runtime_error("Failed to establish server session keys");
     }
 
-    // Zero out becaus e of security reasons
+    memcpy(server_hello_crypto.server_ephemeral_public_key, server_ephemeral.public_key, crypto_kx_PUBLICKEYBYTES);
+    memcpy(server_hello_crypto.signature_message, crypto_session.signature_message, crypto_sign_BYTES);
+
     sodium_memzero(server_ephemeral.secret_key, sizeof(server_ephemeral.secret_key));
 
-    return crypto_session;
-    }
+    session_map_.emplace(server_hello_crypto.unique_identifier, crypto_session);
+    
+    return server_hello_crypto;
 }
 
 ClientHelloCrypto CryptoManager::generate_client_hello(const std::string& client_base_id) {
@@ -221,7 +233,7 @@ void CryptoManager::store_server_identity(const ServerIdentity& id) {
     }
 }
 
-CryptoManager::CryptoSessionConfig CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_crypto) {
+void CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_crypto) {
 
     if (crypto_sign_verify_detached(
             server_hello_crypto.signature_message,
@@ -251,5 +263,26 @@ CryptoManager::CryptoSessionConfig CryptoManager::establish_client_session(Serve
     // Zero out here aswell because of security reasons
     sodium_memzero(client_buffer_ephemeral_.secret_key, sizeof(client_buffer_ephemeral_.secret_key));
 
-    return crypto_session;
+    session_map_.emplace(server_hello_crypto.unique_identifier, crypto_session);
+}
+
+ServerHelloCrypto CryptoManager::generate_server_hello() {
+    auto server_ephemeral = generate_x25519_keypair();
+    ServerHelloCrypto server_hello;
+    memcpy(server_hello.server_ephemeral_public_key, server_ephemeral.public_key, crypto_kx_PUBLICKEYBYTES);
+
+    if (crypto_sign_detached(
+            server_hello.signature_message,
+            nullptr,
+            server_ephemeral.public_key,
+            crypto_kx_PUBLICKEYBYTES,
+            server_identity_.secret_key_id
+        ) != 0) {
+        throw std::runtime_error("Failed to sign server ephemeral key");
+    }
+
+    // Zero out for security reasons
+    sodium_memzero(server_ephemeral.secret_key, sizeof(server_ephemeral.secret_key));
+
+    return server_hello;
 }
