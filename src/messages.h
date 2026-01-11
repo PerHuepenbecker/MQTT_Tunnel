@@ -1,8 +1,10 @@
 #pragma once
 
+#include <sodium.h>
 #include <string>
 #include <sstream>
 #include <cereal/archives/json.hpp>
+#include <cereal/types/array.hpp>
 
 template <typename MessageType>
 class MessageSerializer{
@@ -175,3 +177,50 @@ struct SessionTermination {
     }
 };
 
+struct ClientHelloCrypto {
+    std::string message_identifier = "CLIENT_HELLO_CRYPTO";
+
+    std::string client_base_id;
+    uint8_t client_ephemeral_public_key[crypto_kx_PUBLICKEYBYTES];
+    
+    // uint8_t signature_message[crypto_sign_BYTES];  Possible for future mTLS like authentication
+
+    template <class Archive>
+    void serialize(Archive& archive) {
+    archive(cereal::make_nvp("message_identifier", message_identifier),
+            cereal::make_nvp("client_base_id", client_base_id),
+            cereal::make_nvp("client_ephemeral_public_key", client_ephemeral_public_key));
+}
+
+    std::string to_string() const {
+        return MessageSerializer<ClientHelloCrypto>::to_string(*this);
+    }
+
+    static ClientHelloCrypto from_string(const std::string& str) {
+        return MessageSerializer<ClientHelloCrypto>::from_string(str);
+    }
+};
+
+struct ServerHelloCrypto {
+    std::string message_identifier = "SERVER_HELLO_CRYPTO";
+
+    std::string unique_identifier; // Session specific unique identifier to find correct decryption keys
+    uint8_t server_ephemeral_public_key[crypto_kx_PUBLICKEYBYTES];
+    uint8_t signature_message[crypto_sign_BYTES];
+
+    template <class Archive>
+    void serialize(Archive& archive) {
+    archive(cereal::make_nvp("message_identifier", message_identifier),
+            cereal::make_nvp("unique_identifier", unique_identifier),
+            cereal::make_nvp("server_ephemeral_public_key", server_ephemeral_public_key),
+            cereal::make_nvp("signature_message", signature_message));
+}
+
+    std::string to_string() const {
+        return MessageSerializer<ServerHelloCrypto>::to_string(*this);
+    }
+
+    static ServerHelloCrypto from_string(const std::string& str) {
+        return MessageSerializer<ServerHelloCrypto>::from_string(str);
+    }
+};
