@@ -85,7 +85,9 @@ void TunnelClient::setup_session() {
 
         crypto_manager_.establish_client_session(server_hello_crypto);
         // Hotfix - possible shadowing bug here - verify later
+        client_base_id_ = server_hello_crypto.unique_identifier;
         client_hello.client_base_id = server_hello_crypto.unique_identifier; // Use unique identifier for further session identification TODO: Fix this logic later
+
     }
     
     std::random_device rd;
