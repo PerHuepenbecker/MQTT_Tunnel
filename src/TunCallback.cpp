@@ -12,6 +12,11 @@ TunCallback::TunCallback(int tun_fd, CryptoManager& crypto, bool encryption_enab
 void TunCallback::message_arrived(mqtt::const_message_ptr msg) {
     std::string payload = msg->get_payload();
 
+    if(is_json_payload(payload)) {
+        spdlog::debug("Received JSON payload, skipping decryption");
+        return;
+}
+
     if (encryption_enabled_) {
         try {
             std::string topic = msg->get_topic();

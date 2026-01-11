@@ -301,6 +301,10 @@ void TunnelServer::async_tun_read() {
                 continue;
             }
         } else {
+
+            spdlog::debug("Server sending unencrypted packet for {}: {} bytes", 
+                          session.client_id, read_bytes);
+
             payload_to_send.assign(buffer.data(), read_bytes);
         }
     
