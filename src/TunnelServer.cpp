@@ -1,6 +1,5 @@
 #include "TunnelServer.hpp"
 
-
 TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size, std::atomic<bool>* run_flag, bool enable_encryption)
     : mqtt_channels_(broker_address, command_channel_name),
       tun_device_(tun_device_name),
@@ -116,8 +115,10 @@ void TunnelServer::stop_server() {
 
 void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
 
+    spdlog::info("Received handshake message: {}", msg->get_payload());
+
     try {
-        if(msg->get_payload().find("CLIENT_HELLO_CRYPTO")){
+        if (msg->get_payload().find("CLIENT_HELLO_CRYPTO") != std::string::npos){
             spdlog::debug("Received Client Hello Crypto message");
             spdlog::debug("Processing Client Hello Crypto...");
 
@@ -131,8 +132,8 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
             mqtt::message_ptr crypto_hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello_crypto_serialized);
             crypto_hello_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(crypto_hello_msg);
-           
         }
+        spdlog::debug("Processing regular Client Hello...");
 
         ClientHello client_hello = ClientHello::from_string(msg->get_payload());
 

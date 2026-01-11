@@ -9,6 +9,7 @@ TunnelClient::TunnelClient(const std::string& broker_address,
       tun_device_(tun_device_name),
       command_channel_name_(command_channel_name),
       client_base_id_(client_base_id),
+    encryption_enabled(enable_encryption),
       crypto_manager_(CryptoManager::ROLE_CLIENT, enable_encryption, false) {}
 
 void TunnelClient::start_tunnel() {
