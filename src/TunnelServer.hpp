@@ -51,12 +51,17 @@ class TunnelServerBuilder {
                     return *this;
                 }
 
+                TunnelServerBuilder& set_enable_encryption(bool enable_encryption) {
+                    enable_encryption_ = enable_encryption;
+                    return *this;
+                }
+
                 std::unique_ptr<TunnelServer> build() {
                     if (broker_address_.empty() || command_channel_name_.empty()) {
                         throw std::runtime_error("Broker address and command channel name must be set");
                     }
 
-                    return std::make_unique<TunnelServer>(broker_address_, command_channel_name_, tun_device_name_, ip_pool_base_, ip_pool_size_, run_flag_);
+                    return std::make_unique<TunnelServer>(broker_address_, command_channel_name_, tun_device_name_, ip_pool_base_, ip_pool_size_, run_flag_, enable_encryption_);
                 }
 
             private:
@@ -66,6 +71,7 @@ class TunnelServerBuilder {
                 std::string tun_device_name_ = "tun0"; // default TUN device name
                 std::string ip_pool_base_ = "10.0.0.0"; // default IP pool base
                 unsigned int ip_pool_size_ = 253; // default IP pool size
+                bool enable_encryption_ = true;
         };
 
 
@@ -76,7 +82,8 @@ class TunnelServer {
                         const std::string& tun_device_name = "tun0",
                         const std::string& ip_pool_base = "10.0.0.0",
                         unsigned int ip_pool_size = 253,
-                        std::atomic<bool>* run_flag = nullptr
+                        std::atomic<bool>* run_flag = nullptr,
+                        bool enable_encryption = true
                     );
 
         ~TunnelServer() {
@@ -100,16 +107,19 @@ class TunnelServer {
         using ClientID = std::string;
         using TunnelAddress = std::string;
 
-        MQTTChannels mqtt_channels_;         // Two MQTT clients here for clear channel separation
-        TunDevice tun_device_;               // TUN device wrapper
-        IPPool ip_pool_;                     // address pool for client IPs
-        std::string command_channel_name_;   // command channel name - preshared information
-        SessionMap<SessionConfig> active_clients_;          // Threadsafe map of currently active clients with session info
-        std::string own_ip_address_;         // IP address of the server side TUN device
-        std::atomic<bool>* global_run_flag_ = nullptr; // pointer to global run flag from main
+        MQTTChannels mqtt_channels_;                    // Two MQTT clients here for clear channel separation
+        TunDevice tun_device_;                          // TUN device wrapper
+        IPPool ip_pool_;                                // address pool for client IPs
+        std::string command_channel_name_;              // command channel name - preshared information
+        SessionMap<SessionConfig> active_clients_;      // Threadsafe map of currently active clients with session info
+        std::string own_ip_address_;                    // IP address of the server side TUN device
+        std::atomic<bool>* global_run_flag_ = nullptr;  // pointer to global run flag from main
+
+        CryptoManager crypto_manager_;                  // Crypto manager instance for handling encryption
         
         bool command_channel_connected_ = false;
         bool data_channel_connected_ = false;
+        bool encryption_enabled_ = true;
 
         std::atomic<bool> tunnel_active_{false}; 
         std::thread tun_read_async_thread_;

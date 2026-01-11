@@ -3,17 +3,19 @@
 TunnelClient::TunnelClient(const std::string& broker_address,
                              const std::string& command_channel_name,
                              const std::string& client_base_id,
-                             const std::string& tun_device_name)
+                             const std::string& tun_device_name,
+                            bool enable_encryption)
     : mqtt_channels_(broker_address, client_base_id),
       tun_device_(tun_device_name),
       command_channel_name_(command_channel_name),
-      client_base_id_(client_base_id) {}
+      client_base_id_(client_base_id),
+      crypto_manager_(CryptoManager::ROLE_CLIENT, enable_encryption, false) {}
 
 void TunnelClient::start_tunnel() {
     connect_command_channel();
     setup_session();
     connect_data_channel();
-    mqtt_channels_.set_tun_callback(tun_device_.fd());
+    mqtt_channels_.set_tun_callback(tun_device_.fd(), encryption_enabled, crypto_manager_);
     tunnel_active_ = true;
     tun_read_thread_ = std::thread(&TunnelClient::async_tun_read, this);
     spdlog::info("Tunnel client started");
@@ -50,8 +52,38 @@ void TunnelClient::setup_session() {
     client_hello.client_base_id =  client_base_id_;
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
-    
 
+    if (encryption_enabled) {
+
+        // Exchange process for Cryptographic keys before further session setup if crypto is enabled
+
+        ClientHelloCrypto client_hello_crypto = crypto_manager_.generate_client_hello(client_base_id_);
+
+        std::string client_hello_crypto_serialized = client_hello_crypto.to_string();
+
+        mqtt::message_ptr crypto_hello_msg = mqtt::make_message(command_channel_name_ + "_RX", client_hello_crypto_serialized);
+        crypto_hello_msg->set_qos(1);
+        mqtt_channels_.get_command_client().publish(crypto_hello_msg);
+
+        spdlog::debug("Sent Client Hello Crypto, waiting for Server Hello Crypto...");
+
+        mqtt::const_message_ptr crypto_response = mqtt_channels_.get_command_client().consume_message();
+        
+        // Currently blocking wait for simplicity - refactor to async with state machine later still open TODO
+
+        if(!crypto_response) {
+            throw std::runtime_error("Failed to receive Server Hello Crypto message");
+        }
+
+        // Process server hello crypto message and establish session keys
+        ServerHelloCrypto server_hello_crypto = ServerHelloCrypto::from_string(crypto_response->get_payload());
+
+        spdlog::debug("Received Server Hello Crypto");
+
+        crypto_manager_.establish_client_session(server_hello_crypto);
+        client_base_id_ = server_hello_crypto.unique_identifier; // Use unique identifier for further session identification TODO: Fix this logic later
+    }
+    
     std::random_device rd;
     std::uniform_int_distribution<uint64_t> dist;
     std::stringstream ss;
@@ -60,7 +92,9 @@ void TunnelClient::setup_session() {
 
     client_hello.handshake_identifier = ss.str();
 
-    mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_RX", client_hello.to_string());
+    std::string client_hello_serialized = client_hello.to_string();
+
+    mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_RX", client_hello_serialized);
     hello_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(hello_msg);
 
@@ -71,7 +105,10 @@ void TunnelClient::setup_session() {
         throw std::runtime_error("Failed to receive Server Hello message");
     }
 
-    ServerHello server_hello = ServerHello::from_string(response->get_payload());
+    std::string response_payload = response->get_payload();
+    
+
+    ServerHello server_hello = ServerHello::from_string(response_payload);
 
     spdlog::debug("Received Server Hello");
 
@@ -94,7 +131,9 @@ void TunnelClient::setup_session() {
     client_ack.message_identifier = "CLIENT_ACK";
     client_ack.handshake_identifier = server_hello.handshake_identifier;
 
-    mqtt::message_ptr ack_msg = mqtt::make_message(command_channel_name_ + "_RX", client_ack.to_string());
+    std::string ack_payload = client_ack.to_string();
+
+    mqtt::message_ptr ack_msg = mqtt::make_message(command_channel_name_ + "_RX", ack_payload);
     ack_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(ack_msg); 
 
@@ -103,7 +142,12 @@ void TunnelClient::setup_session() {
         throw std::runtime_error("Failed to receive Server ACK message"); 
     }
 
-    ServerACK server_ack = ServerACK::from_string(ack_response->get_payload());
+    std::string ack_response_payload = ack_response->get_payload();
+    if(encryption_enabled){
+        ack_response_payload = crypto_manager_.decrypt_data(std::vector<unsigned char>(ack_response_payload.begin(), ack_response_payload.end()), client_base_id_);
+    }
+
+    ServerACK server_ack = ServerACK::from_string(ack_response_payload);
     if (server_ack.handshake_identifier != client_hello.handshake_identifier) {
         throw std::runtime_error("Handshake identifier mismatch in Server ACK");
     }
@@ -159,6 +203,11 @@ void TunnelClient::connect_data_channel() {
 void TunnelClient::async_tun_read() {
     
     char buffer[1500];
+    std::string data_to_send;
+    if (encryption_enabled)
+    {
+       data_to_send.reserve(1500); 
+    }
 
         while (tunnel_active_) {
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
@@ -167,8 +216,18 @@ void TunnelClient::async_tun_read() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
+            
 
-            mqtt::message_ptr pubmsg = mqtt::make_message(session_config_.topic_outbound, std::string(buffer, bytes_read));
+            if(encryption_enabled) {
+                data_to_send = crypto_manager_.encrypt_data(std::vector<unsigned char>(buffer, buffer + bytes_read), client_base_id_);
+
+                spdlog::debug("Encrypted {} bytes of data from TUN device", bytes_read);
+
+            } else {
+                data_to_send.assign(buffer, bytes_read);
+            }
+
+            mqtt::message_ptr pubmsg = mqtt::make_message(session_config_.topic_outbound, data_to_send);
             pubmsg->set_qos(1);
             mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));
 

@@ -1,12 +1,14 @@
 #include "TunnelServer.hpp"
 
 
-TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size, std::atomic<bool>* run_flag)
+TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size, std::atomic<bool>* run_flag, bool enable_encryption)
     : mqtt_channels_(broker_address, command_channel_name),
       tun_device_(tun_device_name),
       ip_pool_(ip_pool_base, ip_pool_size),
       command_channel_name_(command_channel_name),
-      global_run_flag_(run_flag) {}
+      global_run_flag_(run_flag),
+      encryption_enabled_(enable_encryption),
+      crypto_manager_(CryptoManager::ROLE_SERVER, enable_encryption, false){}
 
 void TunnelServer::start_server() {
 
@@ -29,7 +31,7 @@ void TunnelServer::start_server() {
 
     connect_command_channel();
     connect_data_channel();
-    mqtt_channels_.set_tun_callback(tun_device_.fd());
+    mqtt_channels_.set_tun_callback(tun_device_.fd(), encryption_enabled_, crypto_manager_);
 
     tunnel_active_ = true; // setting the atomic flag for async coordination
     tun_read_async_thread_ = std::thread(&TunnelServer::async_tun_read, this); // start async TUN read thread 
@@ -115,6 +117,23 @@ void TunnelServer::stop_server() {
 void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
 
     try {
+        if(msg->get_payload().find("CLIENT_HELLO_CRYPTO")){
+            spdlog::debug("Received Client Hello Crypto message");
+            spdlog::debug("Processing Client Hello Crypto...");
+
+            ClientHelloCrypto client_hello_crypto = ClientHelloCrypto::from_string(msg->get_payload());
+
+            ServerHelloCrypto server_hello_crypto = crypto_manager_.establish_server_session(client_hello_crypto);
+
+            spdlog::debug("Processed Client Hello Crypto, sending Server Hello Crypto...");
+
+            std::string server_hello_crypto_serialized = server_hello_crypto.to_string();
+            mqtt::message_ptr crypto_hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello_crypto_serialized);
+            crypto_hello_msg->set_qos(1);
+            mqtt_channels_.get_command_client().publish(crypto_hello_msg);
+           
+        }
+
         ClientHello client_hello = ClientHello::from_string(msg->get_payload());
 
         spdlog::info("Received Client Hello from client ID: {}", client_hello.client_base_id);
@@ -253,6 +272,25 @@ void TunnelServer::async_tun_read() {
         }
 
         spdlog::info("Read {} bytes from TUN and publishing to topic {}", read_bytes, session.topic_inbound);
+
+        std::string payload_to_send;
+
+        if (encryption_enabled_) {
+            try {
+                
+                std::vector<unsigned char> plaintext(buffer.begin(), buffer.begin() + read_bytes);
+                
+                payload_to_send = crypto_manager_.encrypt_data(plaintext, session.client_id);
+                
+                spdlog::debug("Server encrypted packet for {}: {} -> {} bytes", 
+                              session.client_id, read_bytes, payload_to_send.size());
+            } catch (const std::exception& e) {
+                spdlog::error("Encryption failed for client {}: {}", session.client_id, e.what());
+                continue;
+            }
+        } else {
+            payload_to_send.assign(buffer.data(), read_bytes);
+        }
     
         mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_inbound, std::string(buffer.data(), read_bytes));
         pubmsg->set_qos(1);

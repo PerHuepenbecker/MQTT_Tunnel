@@ -36,13 +36,18 @@ class TunnelClientBuilder {
             return *this;
         }
 
+        TunnelClientBuilder& set_enable_encryption(bool enable_encryption) {
+            enable_encryption_ = enable_encryption;
+            return *this;
+        }
+
         std::unique_ptr<TunnelClient> build() {
             if (broker_address_.empty() || command_channel_name_.empty() || client_base_id_.empty()) {
                 spdlog::error("Broker address, command channel name, and client base ID must be set");
                 throw std::runtime_error("Broker address, command channel name, and client base ID must be set");
             }
 
-            return std::make_unique<TunnelClient>(broker_address_, command_channel_name_, client_base_id_, tun_device_name_);
+            return std::make_unique<TunnelClient>(broker_address_, command_channel_name_, client_base_id_, tun_device_name_, enable_encryption_);
         }
 
     private:
@@ -50,7 +55,7 @@ class TunnelClientBuilder {
         std::string command_channel_name_;
         std::string client_base_id_;
         std::string tun_device_name_ = "tun0"; // default TUN device name
-        bool encryption_enabled_ = false;
+        bool enable_encryption_ = true;
 };
 
 class TunnelClient {
@@ -58,8 +63,9 @@ class TunnelClient {
         TunnelClient(const std::string& broker_address,
                      const std::string& command_channel_name,
                      const std::string& client_base_id,
-                     const std::string& tun_device_name);
-
+                     const std::string& tun_device_name,
+                     bool enable_encryption);
+                     
         void start_tunnel();
         void stop_tunnel();
 
