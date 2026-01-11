@@ -4,6 +4,7 @@
 #include "MQTTChannels.hpp"
 #include "types.hpp"
 #include "messages.h"
+#include "CryptoManager.hpp"
 
 #include <atomic>
 #include <thread>
@@ -49,8 +50,8 @@ class TunnelClientBuilder {
         std::string command_channel_name_;
         std::string client_base_id_;
         std::string tun_device_name_ = "tun0"; // default TUN device name
+        bool encryption_enabled_ = false;
 };
-
 
 class TunnelClient {
     public:
@@ -69,8 +70,10 @@ class TunnelClient {
         std::string client_base_id_;
         SessionConfig session_config_;
         bool session_configured_ = false;
+        bool encryption_enabled = false;
         std::atomic<bool> tunnel_active_{false};
         std::thread tun_read_thread_;
+        CryptoManager crypto_manager_;
 
         void setup_session();
         void connect_command_channel();
