@@ -224,7 +224,6 @@ void TunnelClient::async_tun_read() {
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
             if (bytes_read < 0) {
                 if(errno == EAGAIN || errno == EWOULDBLOCK) {
-                
                     std::this_thread::sleep_for(std::chrono::milliseconds(10));
                     continue;
                 }
@@ -237,7 +236,7 @@ void TunnelClient::async_tun_read() {
             if(encryption_enabled) {
                 data_to_send = crypto_manager_.encrypt_data(std::vector<unsigned char>(buffer, buffer + bytes_read), client_base_id_);
 
-                spdlog::debug("Encrypted {} bytes of data from TUN device", bytes_read);
+                
 
             } else {
                 data_to_send.assign(buffer, bytes_read);
@@ -245,9 +244,8 @@ void TunnelClient::async_tun_read() {
 
             mqtt::message_ptr pubmsg = mqtt::make_message(session_config_.topic_outbound, data_to_send);
             pubmsg->set_qos(1);
-            mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));
-
-            spdlog::debug("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
+            mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));  
+            
         }
     }
 

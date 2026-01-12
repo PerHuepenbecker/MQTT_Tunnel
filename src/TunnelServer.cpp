@@ -283,8 +283,6 @@ void TunnelServer::async_tun_read() {
             continue; 
         }
 
-        spdlog::info("Read {} bytes from TUN and publishing to topic {}", read_bytes, session.topic_inbound);
-
         std::string payload_to_send;
 
         if (encryption_enabled_) {
@@ -294,16 +292,12 @@ void TunnelServer::async_tun_read() {
                 
                 payload_to_send = crypto_manager_.encrypt_data(plaintext, session.client_id);
                 
-                spdlog::debug("Server encrypted packet for {}: {} -> {} bytes", 
-                              session.client_id, read_bytes, payload_to_send.size());
+    
             } catch (const std::exception& e) {
                 spdlog::error("Encryption failed for client {}: {}", session.client_id, e.what());
                 continue;
             }
         } else {
-
-            spdlog::debug("Server sending unencrypted packet for {}: {} bytes", 
-                          session.client_id, read_bytes);
 
             payload_to_send.assign(buffer.data(), read_bytes);
         }
@@ -313,7 +307,7 @@ void TunnelServer::async_tun_read() {
             payload_to_send.data(), 
             payload_to_send.size()
         );
-        
+
         pubmsg->set_qos(1);
         mqtt_channels_.get_data_client().publish(pubmsg);
     }

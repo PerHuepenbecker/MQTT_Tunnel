@@ -77,13 +77,6 @@ std::string CryptoManager::decrypt_data(
             throw std::runtime_error("Session not found for client ID: " + client_id);
         }  
 
-        // Debugging output for session keys- Dangerous
-        spdlog::debug("Found session for client ID: {}", client_id);
-        spdlog::debug("key rx: ");
-        for (size_t i = 0; i < crypto_kx_SESSIONKEYBYTES; ++i) {
-            spdlog::debug("{:02x}", it->second.rx[i]);
-        }
-
         const CryptoSessionConfig& session = it->second;
 
         const uint8_t* nonce_pointer = full_packet.data();
@@ -196,9 +189,6 @@ ServerHelloCrypto CryptoManager::establish_server_session(ClientHelloCrypto& cli
     spdlog::debug("Established server session for client ID: {}", client_hello_crypto.client_base_id);
     spdlog::debug("Session Unique Identifier: {}", server_hello_crypto.unique_identifier);
 
-    spdlog::critical("SERVER RX KEY: {:spn}", spdlog::to_hex(std::begin(crypto_session.rx), std::end(crypto_session.rx)));
-    spdlog::critical("SERVER TX KEY: {:spn}", spdlog::to_hex(std::begin(crypto_session.tx), std::end(crypto_session.tx)));
-
     session_map_.emplace(server_hello_crypto.unique_identifier, crypto_session);
     
     return server_hello_crypto;
@@ -251,6 +241,9 @@ void CryptoManager::store_server_identity(const ServerIdentity& id) {
 
 void CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_crypto) {
 
+    // Laden der server identity aus lokalen Dateien
+        server_identity_ = load_local_server_identity();
+
     if (crypto_sign_verify_detached(
             server_hello_crypto.signature_message,
             server_hello_crypto.server_ephemeral_public_key,
@@ -275,10 +268,6 @@ void CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_cry
         ) != 0) {
         throw std::runtime_error("Failed to establish client session keys");
     }
-
-    spdlog::critical("CLIENT RX KEY: {}", spdlog::to_hex(std::begin(crypto_session.rx), std::begin(crypto_session.rx) + crypto_kx_SESSIONKEYBYTES));
-    spdlog::critical("CLIENT TX KEY: {}", spdlog::to_hex(std::begin(crypto_session.tx), std::begin(crypto_session.tx) + crypto_kx_SESSIONKEYBYTES));
-
     // Zero out here aswell because of security reasons
     sodium_memzero(client_buffer_ephemeral_.secret_key, sizeof(client_buffer_ephemeral_.secret_key));
 

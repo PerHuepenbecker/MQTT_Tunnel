@@ -42,14 +42,3 @@ inline std::string extract_client_id_from_topic(const std::string& topic) {
     }
     return ""; 
 }
-
-inline bool is_json_payload(const std::string& payload) {
-    size_t first = payload.find_first_not_of(" \t\n\r");
-    if (first == std::string::npos) {
-        return false;
-    }
-    if (payload[first] != '{') {
-        return false;
-    }
-    return true;
-}
