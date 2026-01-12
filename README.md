@@ -6,6 +6,7 @@ Educational Project - Implementation of a MQTT-Network tunnel
 - paho-MQTT C++
 - GTest
 - OpenSSL
+- libsodium
 - cereal 
 - spdlog
 - fmt
@@ -31,18 +32,21 @@ Arguments are:
 
 | Argument          | Type  | Flag                     | Required | Description                                                      |
 |-------------------|-------|--------------------------|----------|------------------------------------------------------------------|
-| Mode              | `<str>` | `-m, --mode`             | Yes      | Defines the tunnel operation mode (client, server).            |
+| Operating Mode    | `<str>` | `-m, --mode`             | Yes      | Defines the tunnel operation mode (client, server).            |
 | Broker            | `<url>` | `-b, --broker`           | Yes      | The MQTT broker URI (e.g., `tcp://localhost:8883`).            |
 | Client ID         | `<str>` | `-i, --client-id`        | Yes      | Identifier                                                     |
 | Command Channel   | `<str>` | `-c, --command-channel`  | Yes      | The MQTT topic used for tunnel setuo                           |
-
+| Verbose Mode      | `<flag>`| `-v, --verbose`          | No       | Verbose Mode for deeper insights.                              |
+| Encryption        | `<flag>`| `-e, --encryption`       | No       | Builtin Encryption via Libsodium                               |
+| Server-Auth       | `<flag>`| `-t --ignore-server-auth`| No       | Client skips Public Key Identification of the server           | 
+ 
 
 You need to run the compiled application with elevated privileges. 
 
 Example: 
 
 ```bash
-    ./mqtt_tunnel -m server -b tcp://192.168.0.2:1883 -c tunnelServer -C tunnelServerCommand
+    ./mqtt_tunnel -m server -b tcp://192.168.0.2:1883 -c tunnelServer -C tunnelServerCommand -e
 ```
 
 This will setup a server / gateway.
