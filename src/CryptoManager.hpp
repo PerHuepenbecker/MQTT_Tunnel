@@ -10,13 +10,15 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#include <filesystem>
+#include <spdlog/fmt/bin_to_hex.h>
 
 #include "messages.h"
 
 class CryptoManager {
     public:
         struct X25519KeyPair {
-        uint8_t public_key[crypto_kx_PUBLICKEYBYTES];
+        uint8_t public_key[crypto_kx_PUBLICKEYBYTES];   
         uint8_t secret_key[crypto_kx_SECRETKEYBYTES];
     };
 
@@ -51,6 +53,7 @@ class CryptoManager {
         ServerHelloCrypto establish_server_session(ClientHelloCrypto& client_hello_crypto);
         ClientHelloCrypto generate_client_hello(const std::string& client_base_id);
         ServerHelloCrypto generate_server_hello();
+        void load_server_public_key();
         void establish_client_session(ServerHelloCrypto& server_hello_crypto);
 
     private:

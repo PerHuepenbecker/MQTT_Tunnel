@@ -1,5 +1,5 @@
 #include "CryptoManager.hpp"
-#include <spdlog/fmt/bin_to_hex.h>
+
 
 
 CryptoManager::CryptoManager(CryptoManager::Role role, bool enable_encryption, bool skip_server_identity_verification) : role_(role), enable_encryption_(enable_encryption), skip_server_identity_verification_(skip_server_identity_verification) {
@@ -215,6 +215,19 @@ std::string CryptoManager::hex_public_key(const ServerIdentity& id) {
     return ss.str();
 }
 
+void CryptoManager::load_server_public_key() {
+    std::ifstream private_key_file("identity.pub", std::ios::binary);
+    if (!private_key_file) {
+        throw std::runtime_error("Failed to open identity.pub for reading");
+    }
+    private_key_file.read(reinterpret_cast<char*>(server_identity_.public_key_id), crypto_sign_PUBLICKEYBYTES);
+    if(private_key_file.gcount() != crypto_sign_PUBLICKEYBYTES) {
+        throw std::runtime_error("identity.pub has wrong size");
+    }
+    server_identity_set_ = true;
+    spdlog::info("Server public key loaded successfully.");
+}
+
 
 void CryptoManager::store_server_identity(const ServerIdentity& id) {
     
@@ -242,21 +255,19 @@ void CryptoManager::store_server_identity(const ServerIdentity& id) {
 void CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_crypto) {
 
     // Laden der server identity aus lokalen Dateien
-        server_identity_ = load_local_server_identity();
+       if(!skip_server_identity_verification_){
+        load_server_public_key();
 
-    if (crypto_sign_verify_detached(
+        if (crypto_sign_verify_detached(
             server_hello_crypto.signature_message,
             server_hello_crypto.server_ephemeral_public_key,
             crypto_kx_PUBLICKEYBYTES,
             server_identity_.public_key_id
         ) != 0) {
-        if (!skip_server_identity_verification_) {
             throw std::runtime_error("Server identity verification failed");
-        } else {
-            spdlog::warn("Server identity verification failed, insecure proceed due to flag");
         }
-    }
-
+        }
+    
     CryptoManager::CryptoSessionConfig crypto_session;
 
     if (crypto_kx_client_session_keys(
