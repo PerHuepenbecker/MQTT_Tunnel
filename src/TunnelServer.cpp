@@ -129,13 +129,16 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
             spdlog::debug("Processed Client Hello Crypto, sending Server Hello Crypto...");
 
             std::string server_hello_crypto_serialized = server_hello_crypto.to_string();
+
+            spdlog::debug("Server Hello Crypto message: {}", server_hello_crypto_serialized);
+
             mqtt::message_ptr crypto_hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello_crypto_serialized);
             crypto_hello_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(crypto_hello_msg);
 
             return;
         }
-        
+
         spdlog::debug("Processing regular Client Hello...");
 
         ClientHello client_hello = ClientHello::from_string(msg->get_payload());
@@ -145,6 +148,8 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
         std::string assigned_ip = ip_pool_.allocate_ip();
         std::string inbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/A";
         std::string outbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/B";
+
+        spdlog::info("Assigned IP: {} Inbound Topic: {} Outbound Topic: {}", assigned_ip, inbound_topic, outbound_topic);
 
         SessionConfig session_config;
         session_config.client_id = client_hello.client_base_id;
@@ -258,11 +263,14 @@ void TunnelServer::async_tun_read() {
         ssize_t read_bytes = read(tun_device_.fd(), buffer.data(), buffer.size());
 
         if(read_bytes < 0) {
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            if (errno == EAGAIN && errno == EWOULDBLOCK) {
+                // if no data available, sleep and continue the loop
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            } else {
                 spdlog::error("Error reading from TUN device: {}", strerror(errno));
+                continue;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            continue;
         }
 
         struct iphdr* ip_header = reinterpret_cast<struct iphdr*>(buffer.data());
@@ -275,8 +283,6 @@ void TunnelServer::async_tun_read() {
             continue; 
         }
 
-        spdlog::info("Read {} bytes from TUN and publishing to topic {}", read_bytes, session.topic_inbound);
-
         std::string payload_to_send;
 
         if (encryption_enabled_) {
@@ -286,17 +292,22 @@ void TunnelServer::async_tun_read() {
                 
                 payload_to_send = crypto_manager_.encrypt_data(plaintext, session.client_id);
                 
-                spdlog::debug("Server encrypted packet for {}: {} -> {} bytes", 
-                              session.client_id, read_bytes, payload_to_send.size());
+    
             } catch (const std::exception& e) {
                 spdlog::error("Encryption failed for client {}: {}", session.client_id, e.what());
                 continue;
             }
         } else {
+
             payload_to_send.assign(buffer.data(), read_bytes);
         }
     
-        mqtt::message_ptr pubmsg = mqtt::make_message(session.topic_inbound, std::string(buffer.data(), read_bytes));
+        mqtt::message_ptr pubmsg = mqtt::make_message(
+            session.topic_inbound, 
+            payload_to_send.data(), 
+            payload_to_send.size()
+        );
+
         pubmsg->set_qos(1);
         mqtt_channels_.get_data_client().publish(pubmsg);
     }

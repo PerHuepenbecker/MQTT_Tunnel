@@ -15,6 +15,7 @@ void TunCallback::message_arrived(mqtt::const_message_ptr msg) {
     if (encryption_enabled_) {
         try {
             std::string topic = msg->get_topic();
+
             
             std::string client_id = extract_client_id_from_topic(topic);
 

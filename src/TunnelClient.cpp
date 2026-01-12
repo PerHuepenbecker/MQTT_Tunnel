@@ -84,7 +84,10 @@ void TunnelClient::setup_session() {
         spdlog::debug("Received Server Hello Crypto");
 
         crypto_manager_.establish_client_session(server_hello_crypto);
-        client_base_id_ = server_hello_crypto.unique_identifier; // Use unique identifier for further session identification TODO: Fix this logic later
+        // Hotfix - possible shadowing bug here - verify later
+        client_base_id_ = server_hello_crypto.unique_identifier;
+        client_hello.client_base_id = server_hello_crypto.unique_identifier; // Use unique identifier for further session identification TODO: Fix this logic later
+
     }
     
     std::random_device rd;
@@ -114,6 +117,14 @@ void TunnelClient::setup_session() {
     ServerHello server_hello = ServerHello::from_string(response_payload);
 
     spdlog::debug("Received Server Hello");
+
+    // QUick and dirty session config fix - Refactor later - TODO
+
+    if (!encryption_enabled) {
+    session_config_.client_id = server_hello.assigned_client_id_;}
+     else {
+    session_config_.client_id = client_base_id_; 
+}
 
     session_config_.client_id = server_hello.assigned_client_id_;
     session_config_.client_address = server_hello.assigned_client_ip;
@@ -146,9 +157,6 @@ void TunnelClient::setup_session() {
     }
 
     std::string ack_response_payload = ack_response->get_payload();
-    if(encryption_enabled){
-        ack_response_payload = crypto_manager_.decrypt_data(std::vector<unsigned char>(ack_response_payload.begin(), ack_response_payload.end()), client_base_id_);
-    }
 
     ServerACK server_ack = ServerACK::from_string(ack_response_payload);
     if (server_ack.handshake_identifier != client_hello.handshake_identifier) {
@@ -215,8 +223,12 @@ void TunnelClient::async_tun_read() {
         while (tunnel_active_) {
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
             if (bytes_read < 0) {
+                if(errno == EAGAIN || errno == EWOULDBLOCK) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    continue;
+                }
+
                 spdlog::error("Error reading from TUN device: {}", strerror(errno));
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
             
@@ -224,7 +236,7 @@ void TunnelClient::async_tun_read() {
             if(encryption_enabled) {
                 data_to_send = crypto_manager_.encrypt_data(std::vector<unsigned char>(buffer, buffer + bytes_read), client_base_id_);
 
-                spdlog::debug("Encrypted {} bytes of data from TUN device", bytes_read);
+                
 
             } else {
                 data_to_send.assign(buffer, bytes_read);
@@ -232,9 +244,8 @@ void TunnelClient::async_tun_read() {
 
             mqtt::message_ptr pubmsg = mqtt::make_message(session_config_.topic_outbound, data_to_send);
             pubmsg->set_qos(1);
-            mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));
-
-            spdlog::debug("Read {} bytes from TUN and published to topic {}", bytes_read, session_config_.topic_outbound);
+            mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));  
+            
         }
     }
 

@@ -1,4 +1,5 @@
 #include "CryptoManager.hpp"
+#include <spdlog/fmt/bin_to_hex.h>
 
 
 CryptoManager::CryptoManager(CryptoManager::Role role, bool enable_encryption, bool skip_server_identity_verification) : role_(role), enable_encryption_(enable_encryption), skip_server_identity_verification_(skip_server_identity_verification) {
@@ -68,6 +69,8 @@ std::string CryptoManager::decrypt_data(
     const std::vector<unsigned char>& full_packet,
     std::string& client_id) 
     {
+
+        spdlog::debug("Decrypting data for client ID: {}", client_id);
 
         auto it = session_map_.find(client_id);
         if (it == session_map_.end()) {
@@ -183,6 +186,9 @@ ServerHelloCrypto CryptoManager::establish_server_session(ClientHelloCrypto& cli
 
     sodium_memzero(server_ephemeral.secret_key, sizeof(server_ephemeral.secret_key));
 
+    spdlog::debug("Established server session for client ID: {}", client_hello_crypto.client_base_id);
+    spdlog::debug("Session Unique Identifier: {}", server_hello_crypto.unique_identifier);
+
     session_map_.emplace(server_hello_crypto.unique_identifier, crypto_session);
     
     return server_hello_crypto;
@@ -235,6 +241,9 @@ void CryptoManager::store_server_identity(const ServerIdentity& id) {
 
 void CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_crypto) {
 
+    // Laden der server identity aus lokalen Dateien
+        server_identity_ = load_local_server_identity();
+
     if (crypto_sign_verify_detached(
             server_hello_crypto.signature_message,
             server_hello_crypto.server_ephemeral_public_key,
@@ -259,7 +268,6 @@ void CryptoManager::establish_client_session(ServerHelloCrypto& server_hello_cry
         ) != 0) {
         throw std::runtime_error("Failed to establish client session keys");
     }
-
     // Zero out here aswell because of security reasons
     sodium_memzero(client_buffer_ephemeral_.secret_key, sizeof(client_buffer_ephemeral_.secret_key));
 
