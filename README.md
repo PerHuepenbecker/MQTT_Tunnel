@@ -37,7 +37,7 @@ Arguments are:
 | Client ID         | `<str>` | `-i, --client-id`        | Yes      | Identifier                                                     |
 | Command Channel   | `<str>` | `-c, --command-channel`  | Yes      | The MQTT topic used for tunnel setuo                           |
 | Verbose Mode      | `<flag>`| `-v, --verbose`          | No       | Verbose Mode for deeper insights.                              |
-| Encryption        | `<flag>`| `-e, --encryption`       | No       | Builtin Encryption via Libsodium                               |
+| Encryption        | `<flag>`| `-x, --insecure`         | No       | No Encryption                               |
 | Server-Auth       | `<flag>`| `-t --ignore-server-auth`| No       | Client skips Public Key Identification of the server           | 
  
 

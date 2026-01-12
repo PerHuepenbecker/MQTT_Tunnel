@@ -29,7 +29,9 @@ int main(int argc, char** argv) {
     std::string broker_address;
     std::string client_id;
     std::string command_channel_name = "mqtt_tunnel/commands";
+
     bool verbose = false;
+    bool unsecure = false;
     bool encryption = true;
     bool ignore_server_authentication = false;
     
@@ -41,7 +43,7 @@ int main(int argc, char** argv) {
     app.add_option("-c,--client-id", client_id, "Client ID for MQTT connection")->required();
     app.add_option("-C,--command-channel", command_channel_name, "MQTT Command Channel Name");
     app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
-    app.add_flag("-e,--encryption", encryption, "Enable encryption (recommended)");
+    app.add_flag("-x,--insecure", unsecure, "Disable encryption (not recommended)");
     app.add_flag("-u,--ignore-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
 
     CLI11_PARSE(app, argc, argv);
@@ -54,6 +56,12 @@ int main(int argc, char** argv) {
     } else {
         spdlog::set_level(spdlog::level::info);
     }
+
+    if (unsecure)
+    {
+        encryption = false;
+    }
+    
 
     try {
         if (mode == MODE_CLIENT) {
