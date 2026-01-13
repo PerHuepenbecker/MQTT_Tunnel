@@ -216,7 +216,7 @@ struct ClientHelloCrypto {
 };
 
 struct ServerHelloCrypto {
-    std::string message_identifier = "SERVER_HELLO_CRYPTO";
+    MessageIdentifier message_identifier = SERVER_HELLO_CRYPTO;
 
     std::string unique_identifier; // Session specific unique identifier to find correct decryption keys
     uint8_t server_ephemeral_public_key[crypto_kx_PUBLICKEYBYTES];

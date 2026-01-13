@@ -77,6 +77,16 @@ class TunnelServerBuilder {
 
 class TunnelServer {
     public:
+
+        using SessionState = enum {
+            HANDSHAKE_CLIENT_HELLO,
+            HANDSHAKE_SERVER_HELLO,
+            HANDSHAKE_CLIENT_ACK,
+            HANDSHAKE_SERVER_ACK,
+            ACTIVE,
+            UNKNOWN
+        };
+
         TunnelServer(const std::string& broker_address,
                         const std::string& command_channel_name, 
                         const std::string& tun_device_name = "tun0",
@@ -95,14 +105,7 @@ class TunnelServer {
 
     private:
 
-        using SessionState = enum {
-            HANDSHAKE_CLIENT_HELLO,
-            HANDSHAKE_SERVER_HELLO,
-            HANDSHAKE_CLIENT_ACK,
-            HANDSHAKE_SERVER_ACK,
-            ACTIVE,
-            UNKNOWN
-        };
+        
 
         using ClientID = std::string;
         using TunnelAddress = std::string;
@@ -124,11 +127,11 @@ class TunnelServer {
         std::atomic<bool> tunnel_active_{false}; 
         std::thread tun_read_async_thread_;
 
-        std::unordered_map<ClientID, SessionState> handshake_states_; // Track handshake states per client
+        std::unordered_map<ClientID, SessionConfig> handshake_states_; // Track handshake states per client
         
         void connect_command_channel();
         void connect_data_channel();
         void async_tun_read();
 
-        void handle_client_handshake(mqtt::const_message_ptr msg); // Currently blockin handshake handler
+        void handle_client_handshake(mqtt::const_message_ptr msg, MessageIdentifier message_type); // Currently blockin handshake handler
 };
