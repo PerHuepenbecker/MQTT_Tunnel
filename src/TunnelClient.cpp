@@ -96,7 +96,9 @@ void TunnelClient::setup_session() {
        << std::setw(16) << std::setfill('0') << dist(rd);
 
     client_hello.handshake_identifier = ss.str();
-
+    client_hello.authentication = false; // not implemented yet
+    client_hello.auth_data = "";
+    
     std::string client_hello_serialized = client_hello.to_string();
 
     mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_RX", client_hello_serialized);
