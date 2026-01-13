@@ -263,4 +263,12 @@ struct EncryptedWrapper {
         archive(cereal::make_nvp("client_id", client_id),
                 cereal::make_nvp("encrypted_payload", encrypted_payload));
     }   
+
+    std::string to_string() const {
+        return MessageSerializer<EncryptedWrapper>::to_string(*this);
+    }
+    
+    static EncryptedWrapper from_string(const std::string& str) {
+        return MessageSerializer<EncryptedWrapper>::from_string(str);
+    }
 };
