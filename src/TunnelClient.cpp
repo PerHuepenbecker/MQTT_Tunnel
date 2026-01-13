@@ -35,7 +35,7 @@ void TunnelClient::stop_tunnel() {
     // TODO: proper reason codes and message generation
 
     SessionTermination term_msg;
-    term_msg.message_identifier = "SESSION_TERMINATION";
+    
     term_msg.client_id = session_config_.client_id;
     term_msg.session_id = session_config_.session_id;
     term_msg.reason = "Client request";
@@ -51,7 +51,6 @@ void TunnelClient::stop_tunnel() {
 
 void TunnelClient::setup_session() {
     ClientHello client_hello;
-    client_hello.message_identifier = "CLIENT_HELLO";
     client_hello.client_base_id =  client_base_id_;
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
@@ -142,8 +141,9 @@ void TunnelClient::setup_session() {
                 session_config_.session_id);
 
     ClientACK client_ack;
-    client_ack.message_identifier = "CLIENT_ACK";
+    
     client_ack.handshake_identifier = server_hello.handshake_identifier;
+    client_ack.client_id = session_config_.client_id;
 
     std::string ack_payload = client_ack.to_string();
 

@@ -124,6 +124,8 @@ class TunnelServer {
         std::atomic<bool> tunnel_active_{false}; 
         std::thread tun_read_async_thread_;
 
+        std::unordered_map<ClientID, SessionState> handshake_states_; // Track handshake states per client
+        
         void connect_command_channel();
         void connect_data_channel();
         void async_tun_read();

@@ -6,6 +6,18 @@
 #include <cereal/archives/json.hpp>
 #include <cereal/types/array.hpp>
 
+enum MessageIdentifier {
+    CLIENT_HELLO_CRYPTO = 1,
+    SERVER_HELLO_CRYPTO = 2,
+    CLIENT_HELLO = 3,
+    SERVER_HELLO = 4,
+    CLIENT_ACK = 5,
+    SERVER_ACK = 6,
+    HANDSHAKE_RST = 7, // unused currently
+    SESSION_TERMINATION = 8
+};
+
+
 template <typename MessageType>
 class MessageSerializer{
     public:
@@ -36,7 +48,7 @@ class MessageSerializer{
 // Client Hello for initiating a session handshake
 
 struct ClientHello {
-    std::string message_identifier;
+    MessageIdentifier message_identifier = CLIENT_HELLO;
     std::string client_base_id;
     bool authentication;
     std::string auth_data; // optional authentication or identification data
@@ -65,7 +77,7 @@ struct ClientHello {
 // Server Hello for client configuration
 
 struct ServerHello {
-    std::string message_identifier;
+    MessageIdentifier message_identifier = SERVER_HELLO;
     std::string handshake_identifier;
     std::string assigned_client_id_;
     std::string assigned_client_ip;
@@ -96,12 +108,14 @@ struct ServerHello {
 };
 
 struct ClientACK {
-    std::string message_identifier;
+    MessageIdentifier message_identifier = CLIENT_ACK;
+    std::string client_id;
     std::string handshake_identifier;
 
     template <class Archive>
     void serialize(Archive& archive) {
         archive(CEREAL_NVP(message_identifier),
+                CEREAL_NVP(client_id),
                 CEREAL_NVP(handshake_identifier));
     }   
 
@@ -115,7 +129,7 @@ struct ClientACK {
 };
 
 struct ServerACK {
-    std::string message_identifier;
+    MessageIdentifier message_identifier = SERVER_ACK;
     std::string handshake_identifier;
 
     template <class Archive>
@@ -134,7 +148,7 @@ struct ServerACK {
 };
 
 struct HandshakeRST {
-    std::string message_identifier;
+    MessageIdentifier message_identifier = HANDSHAKE_RST;
     std::string handshake_identifier;
     std::string error_message;
 
@@ -155,7 +169,7 @@ struct HandshakeRST {
 };
 
 struct SessionTermination {
-    std::string message_identifier;
+    MessageIdentifier message_identifier = SESSION_TERMINATION;
     std::string client_id;
     std::string session_id; // Possible additional session identifier for proper identification
     std::string reason;
@@ -178,7 +192,7 @@ struct SessionTermination {
 };
 
 struct ClientHelloCrypto {
-    std::string message_identifier = "CLIENT_HELLO_CRYPTO";
+    MessageIdentifier message_identifier = CLIENT_HELLO_CRYPTO;
 
     std::string client_base_id;
     uint8_t client_ephemeral_public_key[crypto_kx_PUBLICKEYBYTES];
@@ -222,5 +236,19 @@ struct ServerHelloCrypto {
 
     static ServerHelloCrypto from_string(const std::string& str) {
         return MessageSerializer<ServerHelloCrypto>::from_string(str);
+    }
+};
+
+struct MessageHeader {
+    int type;
+
+    template <class Archive>
+    void serialize(Archive& archive) {
+        
+        archive(cereal::make_nvp("message_identifier", type)); 
+    }
+
+    static MessageHeader from_string(const std::string& str) {
+        return MessageSerializer<MessageHeader>::from_string(str);
     }
 };
