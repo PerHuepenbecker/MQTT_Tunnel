@@ -3,6 +3,7 @@
 #include <sodium.h>
 #include <string>
 #include <sstream>
+#include <vector>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/array.hpp>
 
@@ -251,4 +252,15 @@ struct MessageHeader {
     static MessageHeader from_string(const std::string& str) {
         return MessageSerializer<MessageHeader>::from_string(str);
     }
+};
+
+struct EncryptedWrapper {
+    std::string client_id; // Lookup client session for decryption
+    std::vector <uint8_t> encrypted_payload; // actual encrypted message payload
+
+    template <class Archive>
+    void serialize(Archive& archive) {
+        archive(cereal::make_nvp("client_id", client_id),
+                cereal::make_nvp("encrypted_payload", encrypted_payload));
+    }   
 };
