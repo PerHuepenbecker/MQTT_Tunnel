@@ -6,6 +6,7 @@
 #include <vector>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/array.hpp>
+#include <cereal/types/vector.hpp>
 
 enum MessageIdentifier {
     CLIENT_HELLO_CRYPTO = 1,
