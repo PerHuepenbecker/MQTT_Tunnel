@@ -16,7 +16,8 @@ enum MessageIdentifier {
     CLIENT_ACK = 5,
     SERVER_ACK = 6,
     HANDSHAKE_RST = 7, // unused currently
-    SESSION_TERMINATION = 8
+    SESSION_TERMINATION = 8,
+    ENCRYPTED_WRAPPER = 9
 };
 
 
@@ -256,12 +257,14 @@ struct MessageHeader {
 };
 
 struct EncryptedWrapper {
+    MessageIdentifier message_identifier = ENCRYPTED_WRAPPER;
     std::string client_id; // Lookup client session for decryption
     std::vector <uint8_t> encrypted_payload; // actual encrypted message payload
 
     template <class Archive>
     void serialize(Archive& archive) {
-        archive(cereal::make_nvp("client_id", client_id),
+        archive(cereal::make_nvp("message_identifier", message_identifier),
+                cereal::make_nvp("client_id", client_id),
                 cereal::make_nvp("encrypted_payload", encrypted_payload));
     }   
 
