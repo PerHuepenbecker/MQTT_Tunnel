@@ -17,6 +17,7 @@
 #include <netinet/ip.h>
 #include <chrono>
 #include "CryptoManager.hpp"
+#include <unordered_map>
 
 class TunnelServer;
 
@@ -77,15 +78,6 @@ class TunnelServerBuilder {
 
 class TunnelServer {
     public:
-
-        using SessionState = enum {
-            HANDSHAKE_CLIENT_HELLO,
-            HANDSHAKE_SERVER_HELLO,
-            HANDSHAKE_CLIENT_ACK,
-            HANDSHAKE_SERVER_ACK,
-            ACTIVE,
-            UNKNOWN
-        };
 
         TunnelServer(const std::string& broker_address,
                         const std::string& command_channel_name, 
