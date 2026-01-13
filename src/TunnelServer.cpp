@@ -156,6 +156,17 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
             spdlog::debug("Received Client Hello message");
             spdlog::debug("Processing Client Hello...");
 
+            if(encryption_enabled_) {
+                EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(msg->get_payload());
+
+                std::string decrypted_payload = crypto_manager_.decrypt_data(
+                    std::vector<unsigned char>(encrypted_wrapper.encrypted_payload.begin(), encrypted_wrapper.encrypted_payload.end()),
+                    encrypted_wrapper.client_id
+                );
+
+                msg = mqtt::make_message(msg->get_topic(), decrypted_payload);
+            }
+
             ClientHello client_hello = ClientHello::from_string(msg->get_payload());
 
             // Check current handshake state for this client

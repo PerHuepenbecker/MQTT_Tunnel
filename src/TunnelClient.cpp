@@ -101,6 +101,17 @@ void TunnelClient::setup_session() {
     
     std::string client_hello_serialized = client_hello.to_string();
 
+    if(encryption_enabled){
+        EncryptedWrapper encrypted_wrapper;
+        encrypted_wrapper.client_id = client_base_id_;
+        
+        auto encrypted_payload = crypto_manager_.encrypt_data(std::vector<unsigned char>(client_hello_serialized.begin(), client_hello_serialized.end()), client_base_id_);
+
+        encrypted_wrapper.encrypted_payload = std::vector<uint8_t>(encrypted_payload.begin(), encrypted_payload.end());
+
+        client_hello_serialized = encrypted_wrapper.to_string();
+    }
+
     mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_RX", client_hello_serialized);
     hello_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(hello_msg);
