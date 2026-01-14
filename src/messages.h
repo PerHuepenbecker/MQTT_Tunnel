@@ -67,8 +67,8 @@ struct ClientHello {
                 CEREAL_NVP(client_base_id),
                 CEREAL_NVP(authentication),
                 CEREAL_NVP(auth_data),
-                CEREAL_NVP(handshake_identifier));
-                CEREAL_NVP(tunnel_mode);
+                CEREAL_NVP(handshake_identifier),
+                CEREAL_NVP(tunnel_mode));
     } 
 
     std::string to_string() const {
