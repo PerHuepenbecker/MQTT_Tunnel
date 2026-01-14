@@ -51,7 +51,9 @@ void TunnelServer::start_server() {
 
             // check message type and handle accordingly
 
-            std::string payload = msg->get_payload();
+            auto payload = msg->get_payload();
+
+            spdlog::debug("Message payload: {}", payload);
 
             auto header = MessageHeader::from_string(payload);
 
@@ -77,6 +79,24 @@ void TunnelServer::start_server() {
                 
                 }
                 break;
+
+                case ENCRYPTED_WRAPPER:
+                {
+
+                        EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(msg->get_payload());
+
+                        std::string decrypted_payload = crypto_manager_.decrypt_data(
+                        std::vector<unsigned char>(encrypted_wrapper.encrypted_payload.begin(), encrypted_wrapper.encrypted_payload.end()),
+                        encrypted_wrapper.client_id
+                        );
+
+                        msg = mqtt::make_message(msg->get_topic(), decrypted_payload);
+
+                        auto message_header = MessageHeader::from_string(decrypted_payload);
+
+                        handle_client_handshake(msg, static_cast<MessageIdentifier>(message_header.type));
+                        break;                        
+                }
             
             default:
                 spdlog::info("Handling client handshake message");
@@ -156,16 +176,6 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
             spdlog::debug("Received Client Hello message");
             spdlog::debug("Processing Client Hello...");
 
-            if(encryption_enabled_) {
-                EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(msg->get_payload());
-
-                std::string decrypted_payload = crypto_manager_.decrypt_data(
-                    std::vector<unsigned char>(encrypted_wrapper.encrypted_payload.begin(), encrypted_wrapper.encrypted_payload.end()),
-                    encrypted_wrapper.client_id
-                );
-
-                msg = mqtt::make_message(msg->get_topic(), decrypted_payload);
-            }
 
             ClientHello client_hello = ClientHello::from_string(msg->get_payload());
 
@@ -213,6 +223,18 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
             server_hello.session_id = session_config.session_id;
 
             mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello.to_string());
+
+            if(encryption_enabled_) {
+                EncryptedWrapper encrypted_wrapper;
+                encrypted_wrapper.client_id = client_hello.client_base_id;
+                
+                auto encrypted_payload = crypto_manager_.encrypt_data(std::vector<unsigned char>(hello_msg->get_payload().begin(), hello_msg->get_payload().end()), client_hello.client_base_id);
+
+                encrypted_wrapper.encrypted_payload = std::vector<uint8_t>(encrypted_payload.begin(), encrypted_payload.end());
+
+                hello_msg = mqtt::make_message(command_channel_name_ + "_TX", encrypted_wrapper.to_string());
+            } 
+
             hello_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(hello_msg);
 
@@ -246,6 +268,19 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
         
             server_ack.handshake_identifier = handshake_states_[client_ack.client_id].handshake_identifier;
             mqtt::message_ptr server_ack_msg = mqtt::make_message(command_channel_name_ + "_TX", server_ack.to_string());
+
+
+            if(encryption_enabled_) {
+                EncryptedWrapper encrypted_wrapper;
+                encrypted_wrapper.client_id = client_ack.client_id;
+                
+                auto encrypted_payload = crypto_manager_.encrypt_data(std::vector<unsigned char>(server_ack_msg->get_payload().begin(), server_ack_msg->get_payload().end()), client_ack.client_id);
+
+                encrypted_wrapper.encrypted_payload = std::vector<uint8_t>(encrypted_payload.begin(), encrypted_payload.end());
+
+                server_ack_msg = mqtt::make_message(command_channel_name_ + "_TX", encrypted_wrapper.to_string());
+            }
+
             server_ack_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(server_ack_msg);    
 
