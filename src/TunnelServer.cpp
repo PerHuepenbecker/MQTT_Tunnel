@@ -26,6 +26,8 @@ void TunnelServer::start_server() {
 
     spdlog::info("TUN device configured with IP: {}", own_ip_address_);
 
+
+
     //snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", dst_address);
 
     connect_command_channel();
@@ -40,6 +42,12 @@ void TunnelServer::start_server() {
     auto& command_channel = mqtt_channels_.get_command_client();
     
     mqtt::const_message_ptr msg;
+
+
+    // Enable IP forwarding on the server machine for gateway mode connections
+
+    system("sysctl -w net.ipv4.ip_forward=1");
+
 
     while (*global_run_flag_) {        
 
@@ -74,8 +82,8 @@ void TunnelServer::start_server() {
                 if (dummy_config.tunnel_mode == TunnelMode::GATEWAY) {
 
                     // remove iptables masquerade rule for gateway mode
-                    
-                    std::string iptables_cmd = "iptables -t nat -D POSTROUTING -s " + dummy_config.client_address + "/24 -o eth0 -j MASQUERADE";
+
+                    std::string iptables_cmd = "iptables -t nat -D POSTROUTING -s " + dummy_config.client_address + "/24 -o enp0s5 -j MASQUERADE";
                     system(iptables_cmd.c_str());
 
                     spdlog::debug("Removed gateway mode NAT for client ID: {}", term_msg.client_id);
@@ -303,8 +311,9 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
 
             if (handshake_states_[client_ack.client_id].tunnel_mode == TunnelMode::GATEWAY) {
                 // setup iptables masquerade rule for gateway mode
-                std::string iptables_cmd = "iptables -t nat -A POSTROUTING -s " + handshake_states_[client_ack.client_id].client_address + "/24 -o eth0 -j MASQUERADE";
+                std::string iptables_cmd = "iptables -t nat -A POSTROUTING -s " + handshake_states_[client_ack.client_id].client_address + "/32 -o enp0s5 -j MASQUERADE";
                 system(iptables_cmd.c_str());
+
                 spdlog::debug("Setting up gateway mode routing and NAT for client ID: {}", client_ack.client_id);
             } 
 
