@@ -35,7 +35,7 @@ void TunnelClient::stop_tunnel() {
     // TODO: proper reason codes and message generation
 
     SessionTermination term_msg;
-    term_msg.message_identifier = "SESSION_TERMINATION";
+    
     term_msg.client_id = session_config_.client_id;
     term_msg.session_id = session_config_.session_id;
     term_msg.reason = "Client request";
@@ -51,7 +51,6 @@ void TunnelClient::stop_tunnel() {
 
 void TunnelClient::setup_session() {
     ClientHello client_hello;
-    client_hello.message_identifier = "CLIENT_HELLO";
     client_hello.client_base_id =  client_base_id_;
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
@@ -97,8 +96,21 @@ void TunnelClient::setup_session() {
        << std::setw(16) << std::setfill('0') << dist(rd);
 
     client_hello.handshake_identifier = ss.str();
-
+    client_hello.authentication = false; // not implemented yet
+    client_hello.auth_data = "";
+    
     std::string client_hello_serialized = client_hello.to_string();
+
+    if(encryption_enabled){
+        EncryptedWrapper encrypted_wrapper;
+        encrypted_wrapper.client_id = client_base_id_;
+        
+        auto encrypted_payload = crypto_manager_.encrypt_data(std::vector<unsigned char>(client_hello_serialized.begin(), client_hello_serialized.end()), client_base_id_);
+
+        encrypted_wrapper.encrypted_payload = std::vector<uint8_t>(encrypted_payload.begin(), encrypted_payload.end());
+
+        client_hello_serialized = encrypted_wrapper.to_string();
+    }
 
     mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_RX", client_hello_serialized);
     hello_msg->set_qos(1);
@@ -112,9 +124,19 @@ void TunnelClient::setup_session() {
     }
 
     std::string response_payload = response->get_payload();
-    
+
+    if(encryption_enabled) {
+        EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(response_payload);
+
+        response_payload = crypto_manager_.decrypt_data(
+            std::vector<unsigned char>(encrypted_wrapper.encrypted_payload.begin(), encrypted_wrapper.encrypted_payload.end()),
+            client_base_id_
+        );
+    }
 
     ServerHello server_hello = ServerHello::from_string(response_payload);
+
+
 
     spdlog::debug("Received Server Hello");
 
@@ -142,10 +164,22 @@ void TunnelClient::setup_session() {
                 session_config_.session_id);
 
     ClientACK client_ack;
-    client_ack.message_identifier = "CLIENT_ACK";
+    
     client_ack.handshake_identifier = server_hello.handshake_identifier;
+    client_ack.client_id = session_config_.client_id;
 
     std::string ack_payload = client_ack.to_string();
+
+    if(encryption_enabled) {
+        EncryptedWrapper encrypted_wrapper;
+        encrypted_wrapper.client_id = client_base_id_;
+        
+        auto encrypted_payload = crypto_manager_.encrypt_data(std::vector<unsigned char>(ack_payload.begin(), ack_payload.end()), client_base_id_);
+
+        encrypted_wrapper.encrypted_payload = std::vector<uint8_t>(encrypted_payload.begin(), encrypted_payload.end());
+
+        ack_payload = encrypted_wrapper.to_string();
+    }
 
     mqtt::message_ptr ack_msg = mqtt::make_message(command_channel_name_ + "_RX", ack_payload);
     ack_msg->set_qos(1);
@@ -157,6 +191,15 @@ void TunnelClient::setup_session() {
     }
 
     std::string ack_response_payload = ack_response->get_payload();
+
+    if(encryption_enabled) {
+        EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(ack_response_payload);
+
+        ack_response_payload = crypto_manager_.decrypt_data(
+            std::vector<unsigned char>(encrypted_wrapper.encrypted_payload.begin(), encrypted_wrapper.encrypted_payload.end()),
+            client_base_id_
+        );
+    }
 
     ServerACK server_ack = ServerACK::from_string(ack_response_payload);
     if (server_ack.handshake_identifier != client_hello.handshake_identifier) {

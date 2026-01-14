@@ -45,14 +45,19 @@ void TunnelServer::start_server() {
 
         bool consumed = command_channel.try_consume_message(&msg); // Use non-blocking consume to allow checking run flag
 
-        
         if (consumed) {
             
             spdlog::info("Consumed message from command channel");
 
-            // check if message is a session termination
+            // check message type and handle accordingly
 
-            if (msg->get_payload().find("SESSION_TERMINATION") != std::string::npos) {
+            auto payload = msg->get_payload();
+
+            auto header = MessageHeader::from_string(payload);
+
+            switch (header.type)
+            {{
+                case SESSION_TERMINATION:
 
                 spdlog::info("Received session termination message");
                 SessionTermination term_msg = SessionTermination::from_string(msg->get_payload());
@@ -63,20 +68,40 @@ void TunnelServer::start_server() {
                     spdlog::info("Terminating session for client ID: {}", term_msg.client_id);
                 } else {
                     spdlog::warn("No active session found for client ID: {}", term_msg.client_id);
-                    continue;
+                    break;   
                 }
 
                 active_clients_.remove_session(term_msg.client_id);
                 ip_pool_.release_ip(dummy_config.client_address);
                 spdlog::info("Terminated session for client ID: {}", term_msg.client_id);
                 
-                continue;
+                }
+                break;
 
+                case ENCRYPTED_WRAPPER:
+                {
+
+                        EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(msg->get_payload());
+
+                        std::string decrypted_payload = crypto_manager_.decrypt_data(
+                        std::vector<unsigned char>(encrypted_wrapper.encrypted_payload.begin(), encrypted_wrapper.encrypted_payload.end()),
+                        encrypted_wrapper.client_id
+                        );
+
+                        msg = mqtt::make_message(msg->get_topic(), decrypted_payload);
+
+                        auto message_header = MessageHeader::from_string(decrypted_payload);
+
+                        handle_client_handshake(msg, static_cast<MessageIdentifier>(message_header.type));
+                        break;                        
+                }
+            
+            default:
+                spdlog::info("Handling client handshake message");
+                handle_client_handshake(msg, static_cast<MessageIdentifier>(header.type));
+                break;
             }
-
-            spdlog::info("Handling client handshake message");
-            handle_client_handshake(msg);
-        }
+            }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep to reduce CPU usage
     }
@@ -113,12 +138,14 @@ void TunnelServer::stop_server() {
 // Asynchronous handling with state machines per client would be more robust
 // Current implementation for mvp testing 
 
-void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
+
+void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageIdentifier message_type) {
 
     spdlog::info("Received handshake message: {}", msg->get_payload());
 
-    try {
-        if (msg->get_payload().find("CLIENT_HELLO_CRYPTO") != std::string::npos){
+    switch (message_type) {
+        case CLIENT_HELLO_CRYPTO:
+        {
             spdlog::debug("Received Client Hello Crypto message");
             spdlog::debug("Processing Client Hello Crypto...");
 
@@ -136,92 +163,154 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg) {
             crypto_hello_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(crypto_hello_msg);
 
+            handshake_states_[server_hello_crypto.unique_identifier].session_state = HANDSHAKE_CLIENT_HELLO;
+
             return;
-        }
 
-        spdlog::debug("Processing regular Client Hello...");
+            break;
 
-        ClientHello client_hello = ClientHello::from_string(msg->get_payload());
+        } case CLIENT_HELLO: {
 
-        spdlog::info("Received Client Hello from client ID: {}", client_hello.client_base_id);
+            spdlog::debug("Received Client Hello message");
+            spdlog::debug("Processing Client Hello...");
 
-        std::string assigned_ip = ip_pool_.allocate_ip();
-        std::string inbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/A";
-        std::string outbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/B";
 
-        spdlog::info("Assigned IP: {} Inbound Topic: {} Outbound Topic: {}", assigned_ip, inbound_topic, outbound_topic);
+            ClientHello client_hello = ClientHello::from_string(msg->get_payload());
 
-        SessionConfig session_config;
-        session_config.client_id = client_hello.client_base_id;
-        session_config.client_address = assigned_ip;
-        session_config.server_address = own_ip_address_;
-        session_config.topic_inbound = inbound_topic;
-        session_config.topic_outbound = outbound_topic;
+            // Check current handshake state for this client
+
+            if (handshake_states_.find(client_hello.client_base_id) != handshake_states_.end() &&
+               handshake_states_[client_hello.client_base_id].session_state != HANDSHAKE_CLIENT_HELLO) {
+                spdlog::warn("Unexpected handshake state for client ID: {}", client_hello.client_base_id);
+                return;
+            }
+
+            spdlog::info("Received Client Hello from client ID: {}", client_hello.client_base_id);
+
+            std::string assigned_ip = ip_pool_.allocate_ip();
+            std::string inbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/A";
+            std::string outbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/B";
+
+            spdlog::info("Assigned IP: {} Inbound Topic: {} Outbound Topic: {}", assigned_ip, inbound_topic, outbound_topic);
+
+            SessionConfig session_config;
+            session_config.client_id = client_hello.client_base_id;
+            session_config.client_address = assigned_ip;
+            session_config.server_address = own_ip_address_;
+            session_config.topic_inbound = inbound_topic;
+            session_config.topic_outbound = outbound_topic;
         
-        // Hash based approach for session ID generation
-        // TODO : Refactor message generation to be function based
+            // Hash based approach for session ID generation
+            // TODO : Refactor message generation to be function based
     
-        std::stringstream ss;
-        ss << session_config.client_id << "_" << std::chrono::system_clock::now().time_since_epoch().count();
+            std::stringstream ss;
+            ss << session_config.client_id << "_" << std::chrono::system_clock::now().time_since_epoch().count();
 
-        session_config.session_id = get_sha256_string(ss.str());
+            session_config.session_id = get_sha256_string(ss.str());
+            session_config.session_state = HANDSHAKE_CLIENT_ACK;
+            session_config.handshake_identifier = client_hello.handshake_identifier;
         
-        ServerHello server_hello;
-        server_hello.message_identifier = "SERVER_HELLO";
-        server_hello.handshake_identifier = client_hello.handshake_identifier;
-        server_hello.assigned_client_id_ = client_hello.client_base_id;
-        server_hello.assigned_client_ip = assigned_ip;
-        server_hello.server_address = own_ip_address_;
-        server_hello.assigned_inbound_topic = inbound_topic;
-        server_hello.assigned_outbound_topic = outbound_topic;
-        server_hello.session_id = session_config.session_id;
+            ServerHello server_hello;
+            
+            server_hello.handshake_identifier = client_hello.handshake_identifier;
+            server_hello.assigned_client_id_ = client_hello.client_base_id;
+            server_hello.assigned_client_ip = assigned_ip;
+            server_hello.server_address = own_ip_address_;
+            server_hello.assigned_inbound_topic = inbound_topic;
+            server_hello.assigned_outbound_topic = outbound_topic;
+            server_hello.session_id = session_config.session_id;
 
-        mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello.to_string());
-        hello_msg->set_qos(1);
-        mqtt_channels_.get_command_client().publish(hello_msg);
+            mqtt::message_ptr hello_msg = mqtt::make_message(command_channel_name_ + "_TX", server_hello.to_string());
 
-        spdlog::info("Sent Server Hello to client ID: {}", client_hello.client_base_id);
+            if(encryption_enabled_) {
+                EncryptedWrapper encrypted_wrapper;
+                encrypted_wrapper.client_id = client_hello.client_base_id;
+                
+                auto encrypted_payload = crypto_manager_.encrypt_data(std::vector<unsigned char>(hello_msg->get_payload().begin(), hello_msg->get_payload().end()), client_hello.client_base_id);
+
+                encrypted_wrapper.encrypted_payload = std::vector<uint8_t>(encrypted_payload.begin(), encrypted_payload.end());
+
+                hello_msg = mqtt::make_message(command_channel_name_ + "_TX", encrypted_wrapper.to_string());
+            } 
+
+            hello_msg->set_qos(1);
+            mqtt_channels_.get_command_client().publish(hello_msg);
+
+            spdlog::info("Sent Server Hello to client ID: {}", client_hello.client_base_id);
+
+            handshake_states_[client_hello.client_base_id] = session_config;
+
+            return;
+            break;
+
+        } case CLIENT_ACK: {
+
+            ClientACK client_ack = ClientACK::from_string(msg->get_payload());
+
+            // Check current handshake state for this client
+
+            if(handshake_states_.find(client_ack.client_id) == handshake_states_.end() ||
+               handshake_states_[client_ack.client_id].session_state != HANDSHAKE_CLIENT_ACK) {
+                spdlog::warn("Unexpected handshake state for client ID: {}", client_ack.client_id);
+                return;
+            }
+
+            if(client_ack.handshake_identifier != handshake_states_[client_ack.client_id].handshake_identifier) {
+                throw std::runtime_error("Handshake identifier mismatch in Client ACK");
+            }
+
+            spdlog::info("Received Client ACK from client ID: {}", client_ack.client_id);
 
         
-        mqtt::const_message_ptr ack_msg = mqtt_channels_.get_command_client().consume_message();
-        if(!ack_msg) {
-            throw std::runtime_error("Failed to receive Client ACK message");
+            ServerACK server_ack;
+        
+            server_ack.handshake_identifier = handshake_states_[client_ack.client_id].handshake_identifier;
+            mqtt::message_ptr server_ack_msg = mqtt::make_message(command_channel_name_ + "_TX", server_ack.to_string());
+
+
+            if(encryption_enabled_) {
+                EncryptedWrapper encrypted_wrapper;
+                encrypted_wrapper.client_id = client_ack.client_id;
+                
+                auto encrypted_payload = crypto_manager_.encrypt_data(std::vector<unsigned char>(server_ack_msg->get_payload().begin(), server_ack_msg->get_payload().end()), client_ack.client_id);
+
+                encrypted_wrapper.encrypted_payload = std::vector<uint8_t>(encrypted_payload.begin(), encrypted_payload.end());
+
+                server_ack_msg = mqtt::make_message(command_channel_name_ + "_TX", encrypted_wrapper.to_string());
+            }
+
+            server_ack_msg->set_qos(1);
+            mqtt_channels_.get_command_client().publish(server_ack_msg);    
+
+            spdlog::info("Sent Server ACK to client ID: {}", client_ack.client_id);
+
+            // Here also old system call based route setup - replace asap
+
+            char ip_addr_dst[100];
+            snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", handshake_states_[client_ack.client_id].client_address.c_str());
+            system(ip_addr_dst);
+
+            // End of old system call based route setup block
+        
+            mqtt_channels_.get_data_client().subscribe(handshake_states_[client_ack.client_id].topic_outbound, 1)->wait();
+            active_clients_.add_session(handshake_states_[client_ack.client_id].client_id, handshake_states_[client_ack.client_id]);
+            handshake_states_.erase(client_ack.client_id); // remove from current states map
+            
+            spdlog::info("Session established for client ID: {} with IP: {}", client_ack.client_id, handshake_states_[client_ack.client_id].client_address);
+
+            break;
         }
 
-        ClientACK client_ack = ClientACK::from_string(ack_msg->get_payload());
-        if(client_ack.handshake_identifier != client_hello.handshake_identifier) {
-            throw std::runtime_error("Handshake identifier mismatch in Client ACK");
-        }
+        default:
+            spdlog::warn("Unknown handshake message type received");
+            break;
 
-        spdlog::info("Received Client ACK from client ID: {}", client_hello.client_base_id);
-
-        
-        ServerACK server_ack;
-        server_ack.message_identifier = "SERVER_ACK";
-        server_ack.handshake_identifier = client_hello.handshake_identifier;
-        mqtt::message_ptr server_ack_msg = mqtt::make_message(command_channel_name_ + "_TX", server_ack.to_string());
-        server_ack_msg->set_qos(1);
-        mqtt_channels_.get_command_client().publish(server_ack_msg);    
-
-        spdlog::info("Sent Server ACK to client ID: {}", client_hello.client_base_id);
-
-        // Here also old system call based route setup - replace asap
-
-        char ip_addr_dst[100];
-        snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", assigned_ip.c_str());
-        system(ip_addr_dst);
-
-        // End of old system call based route setup block
-        
-        mqtt_channels_.get_data_client().subscribe(session_config.topic_outbound, 1)->wait();
-        active_clients_.add_session(session_config.client_id, session_config);
-        spdlog::info("Session established for client ID: {} with IP: {}", client_hello.client_base_id, assigned_ip);
-
-    } catch (const std::exception& e) {
-        spdlog::error("Error handling client handshake: {}", e.what());
     }
-
 }
+       
+
+       
+
 
 void TunnelServer::connect_command_channel() {
     auto& command_channel = mqtt_channels_.get_command_client();
