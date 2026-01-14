@@ -53,8 +53,6 @@ void TunnelServer::start_server() {
 
             auto payload = msg->get_payload();
 
-            spdlog::debug("Message payload: {}", payload);
-
             auto header = MessageHeader::from_string(payload);
 
             switch (header.type)
