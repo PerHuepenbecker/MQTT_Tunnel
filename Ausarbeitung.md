@@ -737,6 +737,135 @@ userb@mqtt-vm-b:~$ printf '%s\n' 'TESTNACHRICHT' | nc 10.0.0.1 12345
 (UNKNOWN) [10.0.0.1] 12345 (?) : Connection refused
 userb@mqtt-vm-b:~$
 ```
+## Performance und Latenz
+### A1: Start des MQTT-Tunnel-Servers - Secure- und Baseline Mode Mode (mqtt-vm-a)
+```bash
+sudo ./mqtt_tunnel --mode server --broker 192.168.56.101 --client-id tunnel-server-a --command-channel tunnelA -v
+```
+### B1.1: Start des MQTT-Tunnel-Servers - Baseline Mode (mqtt-vm-b)
+```bash
+sudo ./mqtt_tunnel --mode client --broker 192.168.56.101 --client-id tunnel-client-b --insecure --command-channel tunnelA -v
+```
+
+### B1.2: Start des MQTT-Tunnel-Servers - Secure Mode (mqtt-vm-b)
+```bash
+sudo ./mqtt_tunnel --mode client --broker 192.168.56.101 --client-id tunnel-client-b --command-channel tunnelA -v
+```
+Zusatz: identity.pub im aktuellen Arbeitsverzeichnis vorhanden
+
+### A2.1: iperf3 Server (mqtt-vm-a)
+```bash
+sudo ./mqtt_tunnel --mode server --broker 192.168.56.101 --client-id tunnel-server-a --command-channel tunnelA -v
+Server listening on 5201
+```
+
+### A2.2: Crypto-Nachweis Empfang (mqtt-vm-a)
+Baseline
+```bash
+nc -l -p 12345
+```
+Ausgabe
+```bash
+TESTNACHRICHT
+```
+Secure
+Ausgabe
+(keine Ausgabe)
+
+### tcpdump Capture (physisches Interface)(mqtt-vm-a)
+Baseline:
+```bash
+sudo tcpdump -i enp0s8 -s0 -w mqtt_baseline.pcap port 1883
+```
+
+Secure:
+```bash
+sudo tcpdump -i enp0s8 -s0 -w mqtt_secure.pcap port 1883
+```
+
+### B2.1: TCP-Durchsatzmessung (Baseline, Client → Server) (mqtt-vm-b)
+```bash
+iperf3 -c 10.0.0.1 -t 30
+```
+Ausgabe
+```bash
+[  5]   0.00-30.00  sec  31.1 MBytes  8.70 Mbits/sec  460  sender
+[  5]   0.00-31.19  sec  29.8 MBytes  8.00 Mbits/sec        receiver
+```
+### B2.2: TCP Reverse (Baseline) (mqtt-vm-b)
+```bash
+iperf3 -c 10.0.0.1 -R -t 30 -w 64K
+```
+Ausgabe
+```bash
+[  5]   0.00-30.19  sec  9.23 MBytes  2.56 Mbits/sec  sender
+[  5]   0.00-30.00  sec  9.17 MBytes  2.56 Mbits/sec  receiver
+```
+
+### B2.3: UDP-Messung 10 Mbit/s (Baseline) (mqtt-vm-b)
+```bash
+iperf3 -c 10.0.0.1 -u -b 10M -t 30
+```
+Ausgabe
+```bash
+[  5]   receiver  5.90 Mbits/sec  9829/25769 (38%)
+```
+
+### B2.4: TCP-Durchsatzmessung (Secure, Client → Server) (mqtt-vm-b)
+```bash
+iperf3 -c 10.0.0.1 -t 30
+```
+Ausgabe
+```bash
+[  5]   0.00-30.00  sec  24.1 MBytes  6.75 Mbits/sec  708 sender
+[  5]   0.00-30.83  sec  21.7 MBytes  5.91 Mbits/sec        receiver
+```
+
+### B2.5: UDP-Messung 10 Mbit/s (Secure) (mqtt-vm-b)
+```bash
+iperf3 -c 10.0.0.1 -u -b 10M -t 30
+```
+Ausgabe
+```bash
+[  5]   receiver  7.38 Mbits/sec  6062/25898 (23%)
+```
+
+### B2.6: CPU-Auslastung während Secure TCP Forward (mqtt-vm-b)
+```bash
+pidstat -p $(pgrep -n mqtt_tunnel) 1
+```
+Ausgabe
+```bash
+%CPU 25–35 %
+```
+### B2.7: MSS-Gegenprobe (Secure TCP Forward) (mqtt-vm-b)
+```bash
+iperf3 -c 10.0.0.1 -t 30 -w 64K --set-mss 1200
+```
+Ausgabe
+```bash
+2.14 Mbits/sec receiver
+```
+```bash
+iperf3 -c 10.0.0.1 -t 30 -w 64K --set-mss 1400
+```
+Ausgabe
+```bash
+5.27 Mbits/sec receiver
+```
+
+### B2.8: Crypto-Nachweis (strings-Analyse) (mqtt-vm-b)
+Baseline
+```bash
+printf 'TESTNACHRICHT\n' | nc 10.0.0.1 12345
+```
+
+Secure
+```bash
+printf 'TESTNACHRICHT\n' | nc 10.0.0.1 12345
+```
+
+
 
 
 
