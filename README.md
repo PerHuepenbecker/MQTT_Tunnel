@@ -1,6 +1,12 @@
 # MQTT_Tunnel
 Educational Project - Implementation of a MQTT-Network tunnel
 
+# Features
+
+- Generic IP-treffic routing via MQTT
+- Cryptographic key exchange via x25519
+- Builtin End-to-End encryption 
+
 # Dependencies
 
 - paho-MQTT C++
@@ -50,5 +56,6 @@ Example:
 ```
 
 This will setup a server / gateway.
+
 
 
