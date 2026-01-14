@@ -40,10 +40,10 @@ int main(int argc, char** argv) {
     app.add_option("-m,--mode", mode, "Mode: client or server")->required()
         ->transform(CLI::CheckedTransformer(std::map<std::string, Mode>{{"client", MODE_CLIENT}, {"server", MODE_SERVER}}, CLI::ignore_case));
     app.add_option("-b,--broker", broker_address, "MQTT Broker Address")->required();
-    app.add_option("-c,--client-id", client_id, "Client ID for MQTT connection")->required();
-    app.add_option("-C,--command-channel", command_channel_name, "MQTT Command Channel Name");
+    app.add_option("-i,--client-id", client_id, "Client ID for MQTT connection")->required();
+    app.add_option("-t,--command-topic", command_channel_name, "MQTT Command Channel Name");
     app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
-    app.add_flag("-x,--insecure", unsecure, "Disable encryption (not recommended)");
+    app.add_flag("--insecure", unsecure, "Disable encryption (not recommended)");
     app.add_flag("-u,--ignore-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
 
     CLI11_PARSE(app, argc, argv);
