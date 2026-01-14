@@ -7,6 +7,7 @@
 #include <cereal/archives/json.hpp>
 #include <cereal/types/array.hpp>
 #include <cereal/types/vector.hpp>
+#include "types.hpp"
 
 enum MessageIdentifier {
     CLIENT_HELLO_CRYPTO = 1,
@@ -56,6 +57,7 @@ struct ClientHello {
     bool authentication;
     std::string auth_data; // optional authentication or identification data
     std::string handshake_identifier; // 256 bit random number
+    TunnelMode tunnel_mode;
 
     // using cereal for robust serialization
 
@@ -66,6 +68,7 @@ struct ClientHello {
                 CEREAL_NVP(authentication),
                 CEREAL_NVP(auth_data),
                 CEREAL_NVP(handshake_identifier));
+                CEREAL_NVP(tunnel_mode);
     } 
 
     std::string to_string() const {
