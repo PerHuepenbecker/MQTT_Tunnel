@@ -5,13 +5,15 @@ TunnelClient::TunnelClient(const std::string& broker_address,
                              const std::string& client_base_id,
                              const std::string& tun_device_name,
                             bool enable_encryption,
-                            bool ignore_server_authentication)
+                            bool ignore_server_authentication,
+                            TunnelMode tunnel_mode)
     : mqtt_channels_(broker_address, client_base_id),
       tun_device_(tun_device_name),
       command_channel_name_(command_channel_name),
       client_base_id_(client_base_id),
     encryption_enabled(enable_encryption),
     ignore_server_authentication_(ignore_server_authentication),
+    tunnel_mode_(tunnel_mode),
       crypto_manager_(CryptoManager::ROLE_CLIENT, enable_encryption, ignore_server_authentication) {}
 
 void TunnelClient::start_tunnel() {
@@ -211,8 +213,16 @@ void TunnelClient::setup_session() {
     char ip_addr_dst[100];
 
     snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", session_config_.client_address.c_str());
-    snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", session_config_.server_address.c_str());
 
+    // check tunnel mode for route setup
+    if (tunnel_mode_ == TunnelMode::GATEWAY) {
+        snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add default via %s dev tun0", session_config_.server_address.c_str());
+        spdlog::debug("Setting up gateway mode routing");
+    } else {
+        snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", session_config_.server_address.c_str());
+        spdlog::debug("Setting up connection mode routing");
+    }
+    
     spdlog::debug("Configuring TUN device with IP and routes...");
     spdlog::debug("Executing command: {}", ip_addr_own);
     spdlog::debug("Executing command: {}", ip_addr_dst);

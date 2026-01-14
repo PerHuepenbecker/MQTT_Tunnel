@@ -71,6 +71,16 @@ void TunnelServer::start_server() {
                     break;   
                 }
 
+                if (dummy_config.tunnel_mode == TunnelMode::GATEWAY) {
+
+                    // remove iptables masquerade rule for gateway mode
+                    
+                    std::string iptables_cmd = "iptables -t nat -D POSTROUTING -s " + dummy_config.client_address + "/24 -o eth0 -j MASQUERADE";
+                    system(iptables_cmd.c_str());
+
+                    spdlog::debug("Removed gateway mode NAT for client ID: {}", term_msg.client_id);
+                }
+
                 active_clients_.remove_session(term_msg.client_id);
                 ip_pool_.release_ip(dummy_config.client_address);
                 spdlog::info("Terminated session for client ID: {}", term_msg.client_id);
@@ -199,6 +209,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
             session_config.server_address = own_ip_address_;
             session_config.topic_inbound = inbound_topic;
             session_config.topic_outbound = outbound_topic;
+            session_config.tunnel_mode = client_hello.tunnel_mode;
         
             // Hash based approach for session ID generation
             // TODO : Refactor message generation to be function based
@@ -286,9 +297,16 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
 
             // Here also old system call based route setup - replace asap
 
-            char ip_addr_dst[100];
+            char ip_addr_dst[256];
             snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", handshake_states_[client_ack.client_id].client_address.c_str());
             system(ip_addr_dst);
+
+            if (handshake_states_[client_ack.client_id].tunnel_mode == TunnelMode::GATEWAY) {
+                // setup iptables masquerade rule for gateway mode
+                std::string iptables_cmd = "iptables -t nat -A POSTROUTING -s " + handshake_states_[client_ack.client_id].client_address + "/24 -o eth0 -j MASQUERADE";
+                system(iptables_cmd.c_str());
+                spdlog::debug("Setting up gateway mode routing and NAT for client ID: {}", client_ack.client_id);
+            } 
 
             // End of old system call based route setup block
         
