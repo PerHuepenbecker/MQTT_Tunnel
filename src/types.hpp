@@ -11,6 +11,10 @@ enum SessionState {
             UNKNOWN
         };
 
+enum TunnelMode {
+    CONNECTION,
+    GATEWAY
+};
 
 struct SessionConfig {
     std::string client_id;
@@ -21,4 +25,5 @@ struct SessionConfig {
     std::string session_id;
     std::string handshake_identifier;
     SessionState session_state;
+    TunnelMode tunnel_mode;
 };
