@@ -100,6 +100,7 @@ void TunnelClient::setup_session() {
     client_hello.handshake_identifier = ss.str();
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
+    client_hello.tunnel_mode = tunnel_mode_;
     
     std::string client_hello_serialized = client_hello.to_string();
 
@@ -156,6 +157,7 @@ void TunnelClient::setup_session() {
     session_config_.topic_inbound = server_hello.assigned_inbound_topic;
     session_config_.topic_outbound = server_hello.assigned_outbound_topic;
     session_config_.session_id = server_hello.session_id;
+    
     
     spdlog::debug("Session configured with Client ID: {}, IP: {}, ServerIP: {} Inbound Topic: {}, Outbound Topic: {}, Session ID: {}",
                  session_config_.client_id,
