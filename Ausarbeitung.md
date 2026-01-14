@@ -427,6 +427,31 @@ Damit ist die grundlegende Funktionalität des Tunnels nachgewiesen.
 
 ## 5.2 Performance und Latenz
 
+Zur Bewertung der Leistungsfähigkeit des MQTT-basierten Tunnels wurden Durchsatz- und Latenztests mit *iperf3* durchgeführt. Die Messungen erfolgten über das virtuelle Tunnel-Interface (`tun0`) zwischen Tunnel-Client (`10.0.0.2`) und Tunnel-Server (`10.0.0.1`). Zusätzlich wurden Referenzmessungen ohne Tunnel über das Host-Only-Netzwerk durchgeführt.
+
+Neben dem reinen Durchsatz wurde bei den UDP-Messungen zusätzlich der Jitter betrachtet. Jitter beschreibt die zeitliche Schwankung zwischen aufeinanderfolgenden Paketen und stellt damit ein Maß für die Stabilität der Paketlaufzeiten dar. Ein niedriger Jitter weist auf eine gleichmäßige und vorhersehbare Übertragung hin, während ein hoher Jitter auf Verzögerungsschwankungen im Übertragungspfad schließen lässt. Insbesondere bei zeitkritischen Anwendungen kann ein erhöhter Jitter die Übertragungsqualität negativ beeinflussen.
+
+### TCP-Durchsatz
+
+Im **Baseline-Betrieb (ohne Verschlüsselung)** wurde bei TCP-Messungen ein Durchsatz von etwa **8,7 Mbit/s** im Client-zu-Server-Betrieb erreicht. Im Reverse-Betrieb (Server zu Client) lag der Durchsatz bei etwa **2,6 Mbit/s**. Die Messergebnisse zeigten dabei eine deutliche Abhängigkeit von der verwendeten TCP-Segmentgröße. Kleinere Segmentgrößen führten zu einem signifikanten Rückgang des Durchsatzes, während größere Segmente höhere Übertragungsraten ermöglichten.
+
+Im **verschlüsselten Betrieb** lag der TCP-Durchsatz im Client-zu-Server-Betrieb bei etwa **5,9 Mbit/s**. Im Reverse-Betrieb wurden Werte von etwa **2,6–2,7 Mbit/s** gemessen. Damit zeigte sich im Forward-Betrieb ein moderater Rückgang des Durchsatzes gegenüber dem unverschlüsselten Modus, während im Reverse-Betrieb kein signifikanter Unterschied feststellbar war.
+
+### UDP-Durchsatz, Jitter und Paketverlust
+
+UDP-Messungen zeigten sowohl im unverschlüsselten als auch im verschlüsselten Betrieb bis zu einer Datenrate von **5 Mbit/s** einen stabilen Betrieb ohne Paketverluste. Der gemessene Jitter lag dabei im Bereich von etwa **1–2 ms**.
+
+Bei einer Zielrate von **10 Mbit/s** traten in beiden Betriebsarten Paketverluste auf. Im unverschlüsselten Betrieb wurde ein effektiver Durchsatz von etwa **5,9 Mbit/s** bei einem Paketverlust von rund **38 %** gemessen. Im verschlüsselten Betrieb lag der effektive Durchsatz bei etwa **7,4 Mbit/s**, wobei der Paketverlust bei etwa **23 %** lag.
+
+### Referenzmessungen ohne Tunnel
+
+Die Referenzmessungen ohne Tunnel über das Host-Only-Netzwerk zeigten deutlich höhere Leistungswerte. Hier wurden TCP-Durchsatzraten von etwa **2,6–2,7 Gbit/s** erreicht. UDP-Messungen mit **10 Mbit/s** verliefen ohne Paketverlust und mit einem Jitter von unter **0,1 ms**.
+
+### Einordnung der Ergebnisse
+
+Die Messergebnisse zeigen, dass die Performance des Tunnels primär durch das MQTT-basierte Transportmodell begrenzt wird. Insbesondere die Kapselung jedes IP-Pakets in einzelne MQTT-Nachrichten führt zu einem hohen Overhead und begrenzt den maximal erreichbaren Durchsatz. Die zusätzliche Ende-zu-Ende-Verschlüsselung verursacht im Vergleich dazu lediglich einen moderaten Mehraufwand und stellt keinen dominanten limitierenden Faktor dar.
+
+
 ## 5.3 tcpdump-Analyse
 
 Zur Analyse der Sichtbarkeit des MQTT-Tunnels aus Sicht eines externen Beobachters wurden Netzwerkaufzeichnungen mit `tcpdump` durchgeführt. Ziel war es, zu untersuchen, welche Art von Netzwerkverkehr auf den beteiligten Schnittstellen sichtbar ist und ob der transportierte TCP-Verkehr als solcher erkennbar bleibt.
@@ -485,6 +510,16 @@ Dies erleichtert sowohl die Fehlersuche als auch die Bewertung des Tunnelverhalt
 
 
 # 6. Fazit
+
+Im Rahmen dieses Projekts wurde ein IP-basierter Netzwerk-Tunnel implementiert, der TCP- und ICMP-Verkehr vollständig über MQTT transportiert. Ziel war es, auf der physischen Netzwerkschnittstelle ausschließlich MQTT-Traffic sichtbar zu machen und dennoch eine transparente IP-Kommunikation zwischen Client und Server zu ermöglichen.
+
+Die funktionalen Tests bestätigten die korrekte Arbeitsweise des Tunnels. IP-basierte Kommunikation war ausschließlich über das virtuelle TUN-Interface möglich, während auf der physischen Schnittstelle nur MQTT-Verkehr beobachtet wurde. Eine Analyse mittels `tcpdump` zeigte, dass keine IP- oder TCP-Nutzdaten außerhalb des Tunnels sichtbar waren.
+
+Die durchgeführten Performance- und Latenztests zeigten, dass der erreichbare Durchsatz des Tunnels deutlich unterhalb der nativen Netzwerkleistung liegt. Der maximale TCP-Durchsatz bewegte sich im Bereich weniger Mbit/s und war stark von der effektiven Paket- und Segmentgröße abhängig. UDP-Messungen zeigten bei höheren Datenraten einen zunehmenden Paketverlust. Diese Einschränkungen sind auf das MQTT-basierte Transportmodell und den damit verbundenen Nachrichten-Overhead zurückzuführen.
+
+Die optionale Ende-zu-Ende-Verschlüsselung auf Anwendungsebene wurde erfolgreich integriert. Ein Vergleich zwischen unverschlüsseltem und verschlüsseltem Betrieb zeigte, dass die zusätzliche kryptografische Verarbeitung keinen dominanten Einfluss auf die Gesamtperformance hat. Die Wirksamkeit der Verschlüsselung konnte durch eine Analyse des aufgezeichneten MQTT-Datenverkehrs nachgewiesen werden, bei der im verschlüsselten Betrieb keine Klartext-Nutzdaten mehr identifizierbar waren.
+
+Zusammenfassend zeigt das Projekt, dass MQTT grundsätzlich als Transportmechanismus für IP-Verkehr verwendet werden kann, jedoch mit deutlichen Einschränkungen hinsichtlich der Übertragungsleistung. Der entwickelte Tunnel eignet sich damit vor allem für Szenarien mit geringen Datenraten oder speziellen Anforderungen an Protokollkapselung und Sichtbarkeit, weniger jedoch für leistungsintensive Netzwerkkommunikation.
 
 ---
 
