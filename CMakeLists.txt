@@ -32,8 +32,6 @@ add_executable(mqtt_tunnel
 target_link_libraries(mqtt_tunnel 
     PahoMqttCpp::paho-mqttpp3
     pthread
-    OpenSSL::SSL
-    OpenSSL::Crypto
     spdlog::spdlog
     fmt::fmt
     PkgConfig::LIBSODIUM
@@ -51,10 +49,9 @@ target_link_libraries(mqtt_tunnel_tests
     ${GTEST_LIBRARIES}
     ${GTEST_MAIN_LIBRARIES}
     pthread
-    OpenSSL::SSL
-    OpenSSL::Crypto
     spdlog::spdlog
     fmt::fmt
+    PkgConfig::LIBSODIUM
 )
 
 include(GoogleTest)

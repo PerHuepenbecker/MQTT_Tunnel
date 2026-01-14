@@ -1,27 +1,20 @@
 #pragma once
 
-#include <openssl/sha.h>
-#include <openssl/evp.h>
 #include <string>
 #include <iomanip>
 #include <sstream>
 #include <arpa/inet.h>
+#include <sodium.h>
 
+inline std::string get_sha256_string(const std::string& input) {
+    
+    unsigned char hash[crypto_hash_sha256_BYTES];
+    crypto_hash_sha256(hash, reinterpret_cast<const unsigned char*>(input.data()), input.size());
 
-inline std::string get_sha256_string(const std::string& data) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    EVP_MD_CTX* context = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(context, EVP_sha256(), nullptr);
-    EVP_DigestUpdate(context, data.data(), data.size());
-    EVP_DigestFinal_ex(context, hash, nullptr);
-    EVP_MD_CTX_free(context);
+    char hex_hash[crypto_hash_sha256_BYTES * 2 + 1];
+    sodium_bin2hex(hex_hash, sizeof(hex_hash), hash, sizeof(hash));
 
-    std::stringstream ss;
-    for(int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
-    }
-
-    return ss.str();
+    return std::string(hex_hash);
 }
 
 inline std::string ip_to_string(uint32_t ip_addr) {
