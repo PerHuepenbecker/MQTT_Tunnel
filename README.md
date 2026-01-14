@@ -35,8 +35,8 @@ Arguments are:
 | Operating Mode    | `<str>` | `-m, --mode`             | Yes      | Defines the tunnel operation mode (client, server).            |
 | Broker            | `<url>` | `-b, --broker`           | Yes      | The MQTT broker URI (e.g., `tcp://localhost:1883`).            |
 | Client ID         | `<str>` | `-i, --client-id`        | Yes      | Identifier                                                     |
-| Command Channel   | `<str>` | `-c, --command-channel`  | Yes      | The MQTT topic used for tunnel setuo                           |
-| Tunnel Mode       | `<str>` | `-t, --tunnel-mode`      | Yes      | Tunnel mode - simple connection or gateway                     |
+| Command Channel   | `<str>` | `-t, --command-topic`    | Yes      | The MQTT topic used for tunnel setuo                           |
+| Tunnel Mode       | `<str>` | `-T, --tunnel-mode`      | Yes      | Tunnel mode - simple connection or gateway                     |
 | Verbose Mode      | `<flag>`| `-v, --verbose`          | No       | Verbose Mode for deeper insights.                              |
 | Encryption        | `<flag>`| `--insecure`             | No       | No Encryption                                                  |
 | Server-Auth       | `<flag>`| `--no-server-auth`       | No       | Client skips Public Key Identification of the server           | 
