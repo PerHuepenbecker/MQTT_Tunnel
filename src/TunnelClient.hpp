@@ -55,7 +55,7 @@ class TunnelClientBuilder {
                 throw std::runtime_error("Broker address, command channel name, and client base ID must be set");
             }
 
-            return std::make_unique<TunnelClient>(broker_address_, command_channel_name_, client_base_id_, tun_device_name_, enable_encryption_, ignore_server_authentication_);
+            return std::make_unique<TunnelClient>(broker_address_, command_channel_name_, client_base_id_, tun_device_name_, enable_encryption_, ignore_server_authentication_, tunnel_mode_);
         }
 
     private:
@@ -93,7 +93,7 @@ class TunnelClient {
         std::thread tun_read_thread_;
         CryptoManager crypto_manager_;
         bool ignore_server_authentication_ = false;
-        
+
         TunnelMode tunnel_mode_ = TunnelMode::CONNECTION;
 
         void setup_session();
