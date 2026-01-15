@@ -25,6 +25,8 @@ void TunnelServer::start_server() {
     snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", own_ip_address_.c_str());
 
     system(ip_addr_own);
+
+    system("ip link set dev tun0 mtu 1400");
     system("ip link set tun0 up");
 
     spdlog::debug("TUN device configured with IP: {}", own_ip_address_);

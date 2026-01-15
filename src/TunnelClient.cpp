@@ -279,6 +279,7 @@ void TunnelClient::setup_session() {
     spdlog::debug("Executing command: {}", ip_addr_dst);
 
     system(ip_addr_own);
+    system("ip link set dev tun0 mtu 1400");
     system("ip link set tun0 up");
     system(ip_addr_dst);
 
