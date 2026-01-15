@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     app.add_option("-t,--command-topic", command_channel_name, "MQTT Command Channel Name");
     app.add_option("-T, --tunnel-mode", tunnel_mode_str, "Tunnel Mode: connection or gateway");
     app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
-    app.add_option("--if, --interface", interface_name, "Physical interface Name - default: enp0s5");
+    app.add_option("--interface", interface_name, "Physical interface Name - default: enp0s5");
     app.add_flag("--insecure", unsecure, "Disable encryption (not recommended)");
     app.add_flag("--no-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
 
