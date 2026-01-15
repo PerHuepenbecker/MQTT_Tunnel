@@ -27,7 +27,7 @@ void TunnelServer::start_server() {
     system(ip_addr_own);
     system("ip link set tun0 up");
 
-    spdlog::info("TUN device configured with IP: {}", own_ip_address_);
+    spdlog::debug("TUN device configured with IP: {}", own_ip_address_);
 
     system("iptables -A FORWARD -i tun0 -o enp0s5 -j ACCEPT");
 
@@ -60,7 +60,7 @@ void TunnelServer::start_server() {
 
         if (consumed) {
             
-            spdlog::info("Consumed message from command channel");
+            spdlog::debug("Consumed message from command channel");
 
             // check message type and handle accordingly
 
@@ -120,7 +120,7 @@ void TunnelServer::start_server() {
                 }
             
             default:
-                spdlog::info("Handling client handshake message");
+                spdlog::debug("Handling client handshake message");
                 handle_client_handshake(msg, static_cast<MessageIdentifier>(header.type));
                 break;
             }
@@ -164,7 +164,7 @@ void TunnelServer::stop_server() {
 
 void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageIdentifier message_type) {
 
-    spdlog::info("Received handshake message: {}", msg->get_payload());
+    spdlog::debug("Received handshake message: {}", msg->get_payload());
 
     switch (message_type) {
         case CLIENT_HELLO_CRYPTO:
@@ -208,13 +208,13 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
                 return;
             }
 
-            spdlog::info("Received Client Hello from client ID: {}", client_hello.client_base_id);
+            spdlog::debug("Received Client Hello from client ID: {}", client_hello.client_base_id);
 
             std::string assigned_ip = ip_pool_.allocate_ip();
             std::string inbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/A";
             std::string outbound_topic = command_channel_name_ + "/" + client_hello.client_base_id + "/B";
 
-            spdlog::info("Assigned IP: {} Inbound Topic: {} Outbound Topic: {}", assigned_ip, inbound_topic, outbound_topic);
+            spdlog::debug("Assigned IP: {} Inbound Topic: {} Outbound Topic: {}", assigned_ip, inbound_topic, outbound_topic);
 
             SessionConfig session_config;
             session_config.client_id = client_hello.client_base_id;
@@ -260,7 +260,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
             hello_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(hello_msg);
 
-            spdlog::info("Sent Server Hello to client ID: {}", client_hello.client_base_id);
+            spdlog::debug("Sent Server Hello to client ID: {}", client_hello.client_base_id);
 
             handshake_states_[client_hello.client_base_id] = session_config;
 
@@ -283,7 +283,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
                 throw std::runtime_error("Handshake identifier mismatch in Client ACK");
             }
 
-            spdlog::info("Received Client ACK from client ID: {}", client_ack.client_id);
+            spdlog::debug("Received Client ACK from client ID: {}", client_ack.client_id);
 
         
             ServerACK server_ack;
@@ -306,7 +306,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
             server_ack_msg->set_qos(1);
             mqtt_channels_.get_command_client().publish(server_ack_msg);    
 
-            spdlog::info("Sent Server ACK to client ID: {}", client_ack.client_id);
+            spdlog::debug("Sent Server ACK to client ID: {}", client_ack.client_id);
 
             // Here also old system call based route setup - replace asap
 
@@ -347,11 +347,11 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
 void TunnelServer::connect_command_channel() {
     auto& command_channel = mqtt_channels_.get_command_client();
     try {
-        spdlog::info("Server: Connecting to command channel...");
+        spdlog::debug("Server: Connecting to command channel...");
         command_channel.connect();
-        spdlog::info("Server: Connected! Subscribing to topic: {}", command_channel_name_ + "_RX");
+        spdlog::debug("Server: Connected! Subscribing to topic: {}", command_channel_name_ + "_RX");
         command_channel.subscribe((command_channel_name_+"_RX"), 1);
-        spdlog::info("Server: Subscribed successfully");
+        spdlog::debug("Server: Subscribed successfully");
         command_channel_connected_ = true;
 
     } catch (const mqtt::exception& exc) {
@@ -359,7 +359,7 @@ void TunnelServer::connect_command_channel() {
         throw;
     }
 
-   spdlog::info("Command channel connected");
+   spdlog::debug("Command channel connected");
 }
  
 void TunnelServer::connect_data_channel() {
@@ -373,7 +373,7 @@ void TunnelServer::connect_data_channel() {
         throw;
     }
 
-    std::cout << "Data channel connected" << std::endl;
+    spdlog::debug("Data channel connected");
 }
 
 void TunnelServer::async_tun_read() {

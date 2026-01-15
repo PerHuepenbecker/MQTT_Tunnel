@@ -40,7 +40,7 @@ void TunCallback::message_arrived(mqtt::const_message_ptr msg) {
     if (bytes_written < 0) {
         spdlog::error("Error writing to TUN device: {}", strerror(errno));
     } else {
-        spdlog::info("Wrote {} bytes to TUN device", bytes_written);
+        spdlog::debug("Wrote {} bytes to TUN device", bytes_written);
     }
 }
 
