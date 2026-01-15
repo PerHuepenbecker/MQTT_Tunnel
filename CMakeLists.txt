@@ -7,7 +7,7 @@ enable_testing()
 
 
 find_package(GTest REQUIRED)
-find_package(OpenSSL REQUIRED)
+
 find_package(PahoMqttCpp REQUIRED)
 find_package(cereal CONFIG REQUIRED)
 find_package(spdlog REQUIRED)
@@ -16,7 +16,6 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBSODIUM REQUIRED IMPORTED_TARGET libsodium)
 
 include_directories(${GTEST_INCLUDE_DIRS})
-include_directories(${OPENSSL_INCLUDE_DIR})
 
 add_executable(mqtt_tunnel 
     src/main.cpp

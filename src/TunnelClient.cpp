@@ -5,13 +5,15 @@ TunnelClient::TunnelClient(const std::string& broker_address,
                              const std::string& client_base_id,
                              const std::string& tun_device_name,
                             bool enable_encryption,
-                            bool ignore_server_authentication)
+                            bool ignore_server_authentication,
+                            TunnelMode tunnel_mode)
     : mqtt_channels_(broker_address, client_base_id),
       tun_device_(tun_device_name),
       command_channel_name_(command_channel_name),
       client_base_id_(client_base_id),
     encryption_enabled(enable_encryption),
     ignore_server_authentication_(ignore_server_authentication),
+    tunnel_mode_(tunnel_mode),
       crypto_manager_(CryptoManager::ROLE_CLIENT, enable_encryption, ignore_server_authentication) {}
 
 void TunnelClient::start_tunnel() {
@@ -55,6 +57,8 @@ void TunnelClient::setup_session() {
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
 
+    auto timeout = std::chrono::seconds(1);
+
     if (encryption_enabled) {
 
         // Exchange process for Cryptographic keys before further session setup if crypto is enabled
@@ -69,12 +73,25 @@ void TunnelClient::setup_session() {
 
         spdlog::debug("Sent Client Hello Crypto, waiting for Server Hello Crypto...");
 
-        mqtt::const_message_ptr crypto_response = mqtt_channels_.get_command_client().consume_message();
+        mqtt::const_message_ptr crypto_response;
         
-        // Currently blocking wait for simplicity - refactor to async with state machine later still open TODO
+        int trials = 0;
 
-        if(!crypto_response) {
-            throw std::runtime_error("Failed to receive Server Hello Crypto message");
+        while (trials < 3) {
+            if (mqtt_channels_.get_command_client().try_consume_message(&crypto_response)) {
+                break;
+            } else {
+                std::this_thread::sleep_for(timeout);
+                trials++;
+            }
+        }
+
+        trials=0;
+
+        if (!crypto_response)
+        {
+            spdlog::error("Failed to receive Server handshake message after multiple attempts");
+            exit(EXIT_FAILURE);
         }
 
         // Process server hello crypto message and establish session keys
@@ -98,6 +115,7 @@ void TunnelClient::setup_session() {
     client_hello.handshake_identifier = ss.str();
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
+    client_hello.tunnel_mode = tunnel_mode_;
     
     std::string client_hello_serialized = client_hello.to_string();
 
@@ -118,7 +136,28 @@ void TunnelClient::setup_session() {
 
     spdlog::debug("Sent Client Hello, waiting for Server Hello...");
 
-    mqtt::const_message_ptr response = mqtt_channels_.get_command_client().consume_message();
+    int trials = 0;
+
+    mqtt::const_message_ptr response;
+
+        while (trials < 3) {
+            if (mqtt_channels_.get_command_client().try_consume_message(&response)) {
+                break;
+            } else {
+                std::this_thread::sleep_for(timeout);
+                trials++;
+            }
+        }
+
+        trials=0;
+
+        if (!response)
+        {
+            spdlog::error("Failed to receive Server handshake message after multiple attempts");
+            exit(EXIT_FAILURE);
+        }
+        
+
     if(!response) {
         throw std::runtime_error("Failed to receive Server Hello message");
     }
@@ -155,6 +194,7 @@ void TunnelClient::setup_session() {
     session_config_.topic_outbound = server_hello.assigned_outbound_topic;
     session_config_.session_id = server_hello.session_id;
     
+    
     spdlog::debug("Session configured with Client ID: {}, IP: {}, ServerIP: {} Inbound Topic: {}, Outbound Topic: {}, Session ID: {}",
                  session_config_.client_id,
                  session_config_.client_address,
@@ -185,12 +225,25 @@ void TunnelClient::setup_session() {
     ack_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(ack_msg); 
 
-    mqtt::const_message_ptr ack_response = mqtt_channels_.get_command_client().consume_message();
-    if(!ack_response) {
-        throw std::runtime_error("Failed to receive Server ACK message"); 
-    }
 
-    std::string ack_response_payload = ack_response->get_payload();
+    while (trials < 3) {
+        if (mqtt_channels_.get_command_client().try_consume_message(&response)) {           
+                break;
+            } else {
+                std::this_thread::sleep_for(timeout);
+                trials++;
+            }
+        }
+
+        trials=0;
+
+        if (!response)
+        {
+            spdlog::error("Failed to receive Server handshake message after multiple attempts");
+            exit(EXIT_FAILURE);
+        }
+
+    std::string ack_response_payload = response->get_payload();
 
     if(encryption_enabled) {
         EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(ack_response_payload);
@@ -211,8 +264,16 @@ void TunnelClient::setup_session() {
     char ip_addr_dst[100];
 
     snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", session_config_.client_address.c_str());
-    snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", session_config_.server_address.c_str());
 
+    // check tunnel mode for route setup
+    if (tunnel_mode_ == TunnelMode::GATEWAY) {
+        snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add default via %s dev tun0", session_config_.server_address.c_str());
+        spdlog::debug("Setting up gateway mode routing");
+    } else {
+        snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", session_config_.server_address.c_str());
+        spdlog::debug("Setting up connection mode routing");
+    }
+    
     spdlog::debug("Configuring TUN device with IP and routes...");
     spdlog::debug("Executing command: {}", ip_addr_own);
     spdlog::debug("Executing command: {}", ip_addr_dst);
@@ -225,6 +286,12 @@ void TunnelClient::setup_session() {
     spdlog::debug("Route to server address {} added", session_config_.server_address);
 
     session_configured_ = true;
+
+    spdlog::info("=================================================");
+    spdlog::info("   M Q T T   T U N N E L   C O N N E C T E D    ");
+    spdlog::info("=================================================");
+    spdlog::info("Tunnel-IP:   {}", session_config_.client_address);
+    spdlog::info("Gateway-IP:  {}", session_config_.server_address);
 };
 
 void TunnelClient::connect_command_channel() {
@@ -264,6 +331,8 @@ void TunnelClient::async_tun_read() {
     }
 
         while (tunnel_active_) {
+
+
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
             if (bytes_read < 0) {
                 if(errno == EAGAIN || errno == EWOULDBLOCK) {

@@ -29,6 +29,7 @@ int main(int argc, char** argv) {
     std::string broker_address;
     std::string client_id;
     std::string command_channel_name = "mqtt_tunnel/commands";
+    std::string tunnel_mode_str = "connection";
 
     bool verbose = false;
     bool unsecure = false;
@@ -42,9 +43,10 @@ int main(int argc, char** argv) {
     app.add_option("-b,--broker", broker_address, "MQTT Broker Address")->required();
     app.add_option("-i,--client-id", client_id, "Client ID for MQTT connection")->required();
     app.add_option("-t,--command-topic", command_channel_name, "MQTT Command Channel Name");
+    app.add_option("-T, --tunnel-mode", tunnel_mode_str, "Tunnel Mode: connection or gateway");
     app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
     app.add_flag("--insecure", unsecure, "Disable encryption (not recommended)");
-    app.add_flag("-u,--ignore-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
+    app.add_flag("--no-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -61,7 +63,13 @@ int main(int argc, char** argv) {
     {
         encryption = false;
     }
-    
+
+    // Determine tunnel mode
+
+    TunnelMode tunnel_mode = TunnelMode::CONNECTION;
+    if (tunnel_mode_str == "gateway") {
+        tunnel_mode = TunnelMode::GATEWAY;
+    } 
 
     try {
         if (mode == MODE_CLIENT) {
@@ -70,7 +78,9 @@ int main(int argc, char** argv) {
                    .set_client_base_id(client_id)
                    .set_command_channel_name(command_channel_name)
                    .set_enable_encryption(encryption)
-                    .set_ignore_server_authentication(ignore_server_authentication);
+                    .set_ignore_server_authentication(ignore_server_authentication)
+                    .set_tunnel_mode(tunnel_mode);
+                    
 
             auto client = builder.build();
             client->start_tunnel();

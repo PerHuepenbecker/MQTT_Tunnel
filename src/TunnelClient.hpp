@@ -44,6 +44,10 @@ class TunnelClientBuilder {
             ignore_server_authentication_ = ignore_server_authentication;
             return *this;
         }
+        TunnelClientBuilder& set_tunnel_mode(TunnelMode tunnel_mode) {
+            tunnel_mode_ = tunnel_mode;
+            return *this;
+        }
 
         std::unique_ptr<TunnelClient> build() {
             if (broker_address_.empty() || command_channel_name_.empty() || client_base_id_.empty()) {
@@ -51,7 +55,7 @@ class TunnelClientBuilder {
                 throw std::runtime_error("Broker address, command channel name, and client base ID must be set");
             }
 
-            return std::make_unique<TunnelClient>(broker_address_, command_channel_name_, client_base_id_, tun_device_name_, enable_encryption_, ignore_server_authentication_);
+            return std::make_unique<TunnelClient>(broker_address_, command_channel_name_, client_base_id_, tun_device_name_, enable_encryption_, ignore_server_authentication_, tunnel_mode_);
         }
 
     private:
@@ -61,6 +65,7 @@ class TunnelClientBuilder {
         std::string tun_device_name_ = "tun0"; // default TUN device name
         bool enable_encryption_ = true;
         bool ignore_server_authentication_ = false;
+        TunnelMode tunnel_mode_ = TunnelMode::CONNECTION;
 };
 
 class TunnelClient {
@@ -70,7 +75,8 @@ class TunnelClient {
                      const std::string& client_base_id,
                      const std::string& tun_device_name,
                      bool enable_encryption,
-                     bool ignore_server_authentication);
+                     bool ignore_server_authentication,
+                     TunnelMode tunnel_mode);
                      
         void start_tunnel();
         void stop_tunnel();
@@ -87,6 +93,8 @@ class TunnelClient {
         std::thread tun_read_thread_;
         CryptoManager crypto_manager_;
         bool ignore_server_authentication_ = false;
+
+        TunnelMode tunnel_mode_ = TunnelMode::CONNECTION;
 
         void setup_session();
         void connect_command_channel();
