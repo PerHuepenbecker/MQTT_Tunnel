@@ -57,6 +57,8 @@ void TunnelClient::setup_session() {
     client_hello.authentication = false; // not implemented yet
     client_hello.auth_data = "";
 
+    auto timeout = std::chrono::seconds(1);
+
     if (encryption_enabled) {
 
         // Exchange process for Cryptographic keys before further session setup if crypto is enabled
@@ -71,12 +73,25 @@ void TunnelClient::setup_session() {
 
         spdlog::debug("Sent Client Hello Crypto, waiting for Server Hello Crypto...");
 
-        mqtt::const_message_ptr crypto_response = mqtt_channels_.get_command_client().consume_message();
+        mqtt::const_message_ptr crypto_response;
         
-        // Currently blocking wait for simplicity - refactor to async with state machine later still open TODO
+        int trials = 0;
 
-        if(!crypto_response) {
-            throw std::runtime_error("Failed to receive Server Hello Crypto message");
+        while (trials < 3) {
+            if (mqtt_channels_.get_command_client().try_consume_message(&crypto_response)) {
+                break;
+            } else {
+                std::this_thread::sleep_for(timeout);
+                trials++;
+            }
+        }
+
+        trials=0;
+
+        if (!crypto_response)
+        {
+            spdlog::error("Failed to receive Server handshake message after multiple attempts");
+            exit(EXIT_FAILURE);
         }
 
         // Process server hello crypto message and establish session keys
@@ -121,7 +136,28 @@ void TunnelClient::setup_session() {
 
     spdlog::debug("Sent Client Hello, waiting for Server Hello...");
 
-    mqtt::const_message_ptr response = mqtt_channels_.get_command_client().consume_message();
+    int trials = 0;
+
+    mqtt::const_message_ptr response;
+
+        while (trials < 3) {
+            if (mqtt_channels_.get_command_client().try_consume_message(&response)) {
+                break;
+            } else {
+                std::this_thread::sleep_for(timeout);
+                trials++;
+            }
+        }
+
+        trials=0;
+
+        if (!response)
+        {
+            spdlog::error("Failed to receive Server handshake message after multiple attempts");
+            exit(EXIT_FAILURE);
+        }
+        
+
     if(!response) {
         throw std::runtime_error("Failed to receive Server Hello message");
     }
@@ -189,12 +225,25 @@ void TunnelClient::setup_session() {
     ack_msg->set_qos(1);
     mqtt_channels_.get_command_client().publish(ack_msg); 
 
-    mqtt::const_message_ptr ack_response = mqtt_channels_.get_command_client().consume_message();
-    if(!ack_response) {
-        throw std::runtime_error("Failed to receive Server ACK message"); 
-    }
 
-    std::string ack_response_payload = ack_response->get_payload();
+    while (trials < 3) {
+        if (mqtt_channels_.get_command_client().try_consume_message(&response)) {           
+                break;
+            } else {
+                std::this_thread::sleep_for(timeout);
+                trials++;
+            }
+        }
+
+        trials=0;
+
+        if (!response)
+        {
+            spdlog::error("Failed to receive Server handshake message after multiple attempts");
+            exit(EXIT_FAILURE);
+        }
+
+    std::string ack_response_payload = response->get_payload();
 
     if(encryption_enabled) {
         EncryptedWrapper encrypted_wrapper = EncryptedWrapper::from_string(ack_response_payload);
@@ -237,6 +286,12 @@ void TunnelClient::setup_session() {
     spdlog::debug("Route to server address {} added", session_config_.server_address);
 
     session_configured_ = true;
+
+    spdlog::info("=================================================");
+    spdlog::info("   M Q T T   T U N N E L   C O N N E C T E D    ");
+    spdlog::info("=================================================");
+    spdlog::info("Tunnel-IP:   {}", session_config_.client_address);
+    spdlog::info("Gateway-IP:  {}", session_config_.server_address);
 };
 
 void TunnelClient::connect_command_channel() {
@@ -276,6 +331,8 @@ void TunnelClient::async_tun_read() {
     }
 
         while (tunnel_active_) {
+
+
             ssize_t bytes_read = read(tun_device_.fd(), buffer, sizeof(buffer));
             if (bytes_read < 0) {
                 if(errno == EAGAIN || errno == EWOULDBLOCK) {
