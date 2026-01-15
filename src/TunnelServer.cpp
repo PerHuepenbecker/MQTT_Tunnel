@@ -1,12 +1,13 @@
 #include "TunnelServer.hpp"
 
-TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size, std::atomic<bool>* run_flag, bool enable_encryption)
+TunnelServer::TunnelServer(const std::string& broker_address, const std::string& command_channel_name, const std::string& tun_device_name, const std::string& ip_pool_base, unsigned int ip_pool_size, std::atomic<bool>* run_flag, bool enable_encryption, const std::string& interface_name)
     : mqtt_channels_(broker_address, command_channel_name),
       tun_device_(tun_device_name),
       ip_pool_(ip_pool_base, ip_pool_size),
       command_channel_name_(command_channel_name),
       global_run_flag_(run_flag),
       encryption_enabled_(enable_encryption),
+    interface_name_(interface_name),
       crypto_manager_(CryptoManager::ROLE_SERVER, enable_encryption, false){}
 
 void TunnelServer::start_server() {
@@ -31,9 +32,9 @@ void TunnelServer::start_server() {
 
     spdlog::debug("TUN device configured with IP: {}", own_ip_address_);
 
-    system("iptables -A FORWARD -i tun0 -o enp0s5 -j ACCEPT");
+    system(("iptables -A FORWARD -i tun0 -o " + interface_name_ + " -j ACCEPT").c_str());
 
-    system("iptables -A FORWARD -i enp0s5 -o tun0 -m state --state RELATED,ESTABLISHED -j ACCEPT");
+    system(("iptables -A FORWARD -i " + interface_name_ + " -o tun0 -m state --state RELATED,ESTABLISHED -j ACCEPT").c_str());
 
     //snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", dst_address);
 
@@ -90,7 +91,7 @@ void TunnelServer::start_server() {
 
                     // remove iptables masquerade rule for gateway mode
 
-                    std::string iptables_cmd = "iptables -t nat -D POSTROUTING -s " + dummy_config.client_address + "/24 -o enp0s5 -j MASQUERADE";
+                    std::string iptables_cmd = "iptables -t nat -D POSTROUTING -s " + dummy_config.client_address + "/24 -o " + interface_name_ + " -j MASQUERADE";
                     system(iptables_cmd.c_str());
 
                     spdlog::debug("Removed gateway mode NAT for client ID: {}", term_msg.client_id);
@@ -318,7 +319,7 @@ void TunnelServer::handle_client_handshake(mqtt::const_message_ptr msg, MessageI
 
             if (handshake_states_[client_ack.client_id].tunnel_mode == TunnelMode::GATEWAY) {
                 // setup iptables masquerade rule for gateway mode
-                std::string iptables_cmd = "iptables -t nat -A POSTROUTING -s " + handshake_states_[client_ack.client_id].client_address + "/32 -o enp0s5 -j MASQUERADE";
+                std::string iptables_cmd = "iptables -t nat -A POSTROUTING -s " + handshake_states_[client_ack.client_id].client_address + "/32 -o " + interface_name_ + " -j MASQUERADE";
                 system(iptables_cmd.c_str());
 
                 spdlog::debug("Setting up gateway mode routing and NAT for client ID: {}", client_ack.client_id);

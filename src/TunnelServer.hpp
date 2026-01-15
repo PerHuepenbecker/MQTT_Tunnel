@@ -57,12 +57,17 @@ class TunnelServerBuilder {
                     return *this;
                 }
 
+                TunnelServerBuilder& set_interface_name(const std::string& interface_name) {
+                    interface_name_ = interface_name;
+                    return *this;
+                }
+
                 std::unique_ptr<TunnelServer> build() {
                     if (broker_address_.empty() || command_channel_name_.empty()) {
                         throw std::runtime_error("Broker address and command channel name must be set");
                     }
 
-                    return std::make_unique<TunnelServer>(broker_address_, command_channel_name_, tun_device_name_, ip_pool_base_, ip_pool_size_, run_flag_, enable_encryption_);
+                    return std::make_unique<TunnelServer>(broker_address_, command_channel_name_, tun_device_name_, ip_pool_base_, ip_pool_size_, run_flag_, enable_encryption_, interface_name_);
                 }
 
             private:
@@ -73,6 +78,7 @@ class TunnelServerBuilder {
                 std::string ip_pool_base_ = "10.0.0.0"; // default IP pool base
                 unsigned int ip_pool_size_ = 253; // default IP pool size
                 bool enable_encryption_ = true;
+                std::string interface_name_; // default interface name
         };
 
 
@@ -85,7 +91,8 @@ class TunnelServer {
                         const std::string& ip_pool_base = "10.0.0.0",
                         unsigned int ip_pool_size = 253,
                         std::atomic<bool>* run_flag = nullptr,
-                        bool enable_encryption = true
+                        bool enable_encryption = true,
+                        const std::string& interface_name = "enp0s5"
                     );
 
         ~TunnelServer() {
