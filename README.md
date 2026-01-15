@@ -49,6 +49,7 @@ Arguments are:
 | Verbose Mode      | `<flag>`| `-v, --verbose`          | No       | Verbose Mode for deeper insights.                              |
 | Encryption        | `<flag>`| `--insecure`             | No       | No Encryption                                                  |
 | Server-Auth       | `<flag>`| `--no-server-auth`       | No       | Client skips Public Key Identification of the server           | 
+| Interface         | `<str>` | `--interface`            | No       | Interface for the NAT rules in gateway mode (server side)      |
 
  
 
