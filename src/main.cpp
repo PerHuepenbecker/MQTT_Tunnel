@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     app.add_option("-T, --tunnel-mode", tunnel_mode_str, "Tunnel Mode: connection or gateway");
     app.add_flag("-v,--verbose", verbose, "Enable verbose logging");
     app.add_flag("--insecure", unsecure, "Disable encryption (not recommended)");
-    app.add_flag("-u,--ignore-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
+    app.add_flag("--no-server-auth", ignore_server_authentication, "Ignore server authentication (not recommended)");
 
     CLI11_PARSE(app, argc, argv);
 
