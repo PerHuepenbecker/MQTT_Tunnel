@@ -33,7 +33,7 @@ void TunCallback::message_arrived(mqtt::const_message_ptr msg) {
         }
     }
 
-    spdlog::info("Message arrived with topic: {}", msg->get_topic());
+    spdlog::debug("Message arrived with topic: {}", msg->get_topic());
 
     ssize_t bytes_written = write(tun_fd_, payload.data(), payload.size());
 
