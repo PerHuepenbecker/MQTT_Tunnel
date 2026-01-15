@@ -19,6 +19,9 @@ void TunnelServer::start_server() {
     char ip_addr_own[100];
     //char ip_addr_dst[100];
 
+    
+
+
     snprintf(ip_addr_own, sizeof(ip_addr_own), "ip addr add %s/24 dev tun0", own_ip_address_.c_str());
 
     system(ip_addr_own);
@@ -26,7 +29,9 @@ void TunnelServer::start_server() {
 
     spdlog::info("TUN device configured with IP: {}", own_ip_address_);
 
+    system("iptables -A FORWARD -i tun0 -o enp0s5 -j ACCEPT");
 
+    system("iptables -A FORWARD -i enp0s5 -o tun0 -m state --state RELATED,ESTABLISHED -j ACCEPT");
 
     //snprintf(ip_addr_dst, sizeof(ip_addr_dst), "ip route add %s dev tun0", dst_address);
 
