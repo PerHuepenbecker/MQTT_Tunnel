@@ -76,8 +76,7 @@ class TunnelClient {
                      const std::string& tun_device_name,
                      bool enable_encryption,
                      bool ignore_server_authentication,
-                     TunnelMode tunnel_mode,
-                    const std::string& interface_name);
+                     TunnelMode tunnel_mode);
                      
         void start_tunnel();
         void stop_tunnel();

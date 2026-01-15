@@ -123,6 +123,7 @@ class TunnelServer {
         bool data_channel_connected_ = false;
         bool encryption_enabled_ = true;
 
+        std::string interface_name_;                    // Physical interface name for iptables rules
         std::atomic<bool> tunnel_active_{false}; 
         std::thread tun_read_async_thread_;
 

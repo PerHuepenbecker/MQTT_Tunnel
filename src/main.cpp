@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
             builder.set_broker_address(broker_address)
                    .set_command_channel_name(command_channel_name)
                    .set_global_run_flag(&run)
-                   .set_enable_encryption(encryption);
+                   .set_enable_encryption(encryption)
                    .set_interface_name(interface_name);
             auto server = builder.build();
             server->start_server();

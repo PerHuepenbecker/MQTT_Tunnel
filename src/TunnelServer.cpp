@@ -7,7 +7,7 @@ TunnelServer::TunnelServer(const std::string& broker_address, const std::string&
       command_channel_name_(command_channel_name),
       global_run_flag_(run_flag),
       encryption_enabled_(enable_encryption),
-    interface_name_(interface_name),
+      interface_name_(interface_name),
       crypto_manager_(CryptoManager::ROLE_SERVER, enable_encryption, false){}
 
 void TunnelServer::start_server() {
