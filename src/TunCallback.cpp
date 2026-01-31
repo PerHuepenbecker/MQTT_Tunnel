@@ -33,15 +33,11 @@ void TunCallback::message_arrived(mqtt::const_message_ptr msg) {
         }
     }
 
-    spdlog::debug("Message arrived with topic: {}", msg->get_topic());
-
     ssize_t bytes_written = write(tun_fd_, payload.data(), payload.size());
 
     if (bytes_written < 0) {
         spdlog::error("Error writing to TUN device: {}", strerror(errno));
-    } else {
-        spdlog::debug("Wrote {} bytes to TUN device", bytes_written);
-    }
+    } 
 }
 
 void TunCallback::connection_lost(const std::string& cause) {
