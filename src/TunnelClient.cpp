@@ -328,7 +328,7 @@ void TunnelClient::async_tun_read() {
     std::string data_to_send;
     if (encryption_enabled)
     {
-       data_to_send.reserve(1500); 
+       data_to_send.reserve(8000); 
     }
 
         while (tunnel_active_) {

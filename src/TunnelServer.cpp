@@ -380,9 +380,7 @@ void TunnelServer::connect_data_channel() {
 }
 
 void TunnelServer::async_tun_read() {
-
-    std::vector <char> buffer (1500); // MTU size for TUN device
-
+    std::vector <char> buffer (8000); // MTU size for TUN device
     while(tunnel_active_) {
         ssize_t read_bytes = read(tun_device_.fd(), buffer.data(), buffer.size());
 
