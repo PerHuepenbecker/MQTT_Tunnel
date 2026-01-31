@@ -432,7 +432,7 @@ void TunnelServer::async_tun_read() {
             payload_to_send.size()
         );
 
-        pubmsg->set_qos(1);
+        pubmsg->set_qos(0);
         mqtt_channels_.get_data_client().publish(pubmsg);
     }
 };

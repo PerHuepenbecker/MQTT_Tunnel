@@ -356,7 +356,7 @@ void TunnelClient::async_tun_read() {
             }
 
             mqtt::message_ptr pubmsg = mqtt::make_message(session_config_.topic_outbound, data_to_send);
-            pubmsg->set_qos(1);
+            pubmsg->set_qos(0);
             mqtt_channels_.get_data_client().publish(pubmsg)->wait_for(std::chrono::seconds(10));  
             
         }
